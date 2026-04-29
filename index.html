@@ -1935,6 +1935,59 @@ textarea.field-input {
   margin-top: 4px;
 }
 
+/* Tıklanabilir veteriner raporu olayları */
+.vet-report-event {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 8px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 8px;
+}
+.vet-report-event:active {
+  background: var(--bg-elev);
+}
+.vet-report-event:hover {
+  background: var(--bg-elev);
+}
+
+/* Olay detay kartı */
+.event-detail-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-top: 8px;
+}
+.event-detail-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  align-items: flex-start;
+}
+.event-detail-row:last-child { border-bottom: none; padding-bottom: 0; }
+.event-detail-row:first-child { padding-top: 0; }
+.event-detail-key {
+  min-width: 80px;
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.event-detail-val {
+  flex: 1;
+  color: var(--text);
+  word-break: break-word;
+}
+
 /* ===== TYPE TOGGLE BUTTONS ===== */
 .type-btn {
   flex: 1;
@@ -5408,7 +5461,6 @@ function generateVetReport() {
   const onlyImportant = document.getElementById('vrOnlyImportant').checked;
   if (!start || !end) { toast('Tarih aralığı seç', 'error'); return; }
 
-  // Compute stats
   const startD = parseDate(start);
   const endD = parseDate(end);
   const days = Math.round((endD - startD) / 86400000) + 1;
@@ -5416,16 +5468,13 @@ function generateVetReport() {
   let totalDoses = 0, takenDoses = 0;
   let totalGrams = 0;
   let mealDays = 0;
-  const events = []; // important events
-  const moods = {}; // count
-  const dates = [];
+  const events = [];
+  const moods = {};
 
   for (let i = 0; i < days; i++) {
     const d = new Date(startD); d.setDate(d.getDate() + i);
     const dKey = todayKey(d);
-    dates.push(dKey);
 
-    // Meds
     const log = STATE.data.medLogs[dKey] || {};
     (STATE.data.medSchedule || []).forEach(s => {
       if (s.type === 'meal') return;
@@ -5435,19 +5484,16 @@ function generateVetReport() {
       if (log[s.id]) takenDoses++;
     });
 
-    // Meals
     const meals = STATE.data.mealEntries[dKey] || [];
     if (meals.length > 0) mealDays++;
     totalGrams += meals.reduce((s,e) => s + (parseFloat(e.grams)||0), 0);
 
-    // Journal events
     const entries = STATE.data.journal[dKey] || [];
     entries.forEach(e => {
       if (onlyImportant && !e.important) return;
       events.push({ ...e, date: dKey });
     });
 
-    // Moods
     const m = STATE.data.moods[dKey];
     if (m && m.tags) {
       m.tags.forEach(t => moods[t] = (moods[t]||0) + 1);
@@ -5467,7 +5513,9 @@ function generateVetReport() {
     .map(([k,v]) => `${moodLabels[k]||k}: ${v} gün`)
     .join(', ');
 
-  // Group events by date for display
+  // Save the events globally for click access
+  window._currentVetReport = { events, start, end, onlyImportant, totalDoses, takenDoses, totalGrams, mealDays, avgGrams, adherence, days, moodSummary };
+
   const eventsByDate = {};
   events.forEach(e => {
     if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
@@ -5475,7 +5523,6 @@ function generateVetReport() {
   });
   const eventDates = Object.keys(eventsByDate).sort((a,b) => b.localeCompare(a));
 
-  // Render report
   const reportHtml = `<div class="modal-title">📋 ${fmtDate(start)} — ${fmtDate(end)}</div>
     <div class="modal-subtitle">${days} günlük rapor • ${onlyImportant ? 'sadece dikkat çekici' : 'tüm olaylar'}</div>
 
@@ -5499,6 +5546,7 @@ function generateVetReport() {
 
       ${eventDates.length > 0 ? `<div class="vet-report-section">
         <div class="vet-report-title">${onlyImportant ? '⚠️ Dikkat Çekici Olaylar' : '📖 Tüm Olaylar'} (${events.length})</div>
+        <div style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Detay için tıkla</div>
         ${eventDates.map(date => {
           const dayEvents = eventsByDate[date];
           return `<div style="margin-top: 10px;">
@@ -5506,15 +5554,16 @@ function generateVetReport() {
             ${dayEvents.map(e => {
               const t = new Date(e.time);
               const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-              return `<div style="display: flex; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--border);">
+              return `<div class="vet-report-event" onclick="openVetReportEventDetail('${e.id}','${e.date}')">
                 <span style="font-family: 'Fraunces', serif; color: var(--text-dim); min-width: 44px;">${tStr}</span>
                 <span>${JOURNAL_TYPES[e.type]?.icon||''}</span>
                 <span style="flex: 1;">
                   <b>${escapeHtml(getJournalEntryTitle(e))}</b>
                   ${getJournalEntryDetail(e) ? '<span style="color: var(--text-dim);"> • '+escapeHtml(getJournalEntryDetail(e))+'</span>' : ''}
-                  ${e.note ? '<div style="color: var(--text-dim); font-size: 12px; margin-top: 2px;">'+escapeHtml(e.note)+'</div>' : ''}
                   ${e.important ? '<span style="color: var(--warning); margin-left: 6px;">⚠️</span>' : ''}
+                  ${e.photo ? '<span style="margin-left: 6px; opacity: 0.6;">📷</span>' : ''}
                 </span>
+                <span style="color: var(--text-faint); font-size: 14px;">›</span>
               </div>`;
             }).join('')}
           </div>`;
@@ -5522,11 +5571,194 @@ function generateVetReport() {
       </div>` : `<div class="vet-report-section"><div class="vet-report-title">📖 Olaylar</div><div class="vet-report-sub" style="font-style: italic;">${onlyImportant ? 'Bu aralıkta dikkat çekici bir olay yok.' : 'Bu aralıkta kaydedilmiş olay yok.'}</div></div>`}
     </div>
 
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="openVetReportModal()">‹ Geri</button>
-      <button class="btn btn-primary" onclick="closeModal()">Tamam</button>
+    <div class="modal-actions" style="flex-direction: column; gap: 8px;">
+      <button class="btn btn-primary btn-block" onclick="shareVetReport()">📤 Paylaş (WhatsApp / Mesaj / E-posta)</button>
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <button class="btn btn-secondary" onclick="openVetReportModal()" style="flex:1;">‹ Geri</button>
+        <button class="btn btn-secondary" onclick="closeModal()" style="flex:1;">Tamam</button>
+      </div>
     </div>`;
   openModal(reportHtml);
+}
+
+// Olay detayını veteriner raporundan açma
+function openVetReportEventDetail(eventId, date) {
+  const entries = STATE.data.journal[date] || [];
+  const e = entries.find(x => x.id === eventId);
+  if (!e) { toast('Olay bulunamadı', 'error'); return; }
+  showJournalEventDetail(e, date, true);
+}
+
+function showJournalEventDetail(e, date, fromVetReport) {
+  const t = new Date(e.time);
+  const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+  const typeInfo = JOURNAL_TYPES[e.type] || { icon: '📝', label: 'Olay' };
+
+  // Type-specific detail rendering
+  let detailHtml = '';
+  switch(e.type) {
+    case 'meal':
+      detailHtml = `<div class="event-detail-row"><span class="event-detail-key">Miktar</span><span class="event-detail-val">${e.grams || '?'} g</span></div>`;
+      break;
+    case 'water':
+      detailHtml = `<div class="event-detail-row"><span class="event-detail-key">Miktar</span><span class="event-detail-val">${e.amount || '?'} ml</span></div>`;
+      break;
+    case 'toilet':
+      const kindLbl = { urine: '💧 İdrar', stool: '💩 Kaka', both: 'İdrar + Kaka' };
+      const amountLbl = { low: 'Az', normal: 'Normal', high: 'Çok' };
+      detailHtml = `
+        <div class="event-detail-row"><span class="event-detail-key">Tip</span><span class="event-detail-val">${kindLbl[e.toiletKind]||'—'}</span></div>
+        ${e.toiletAmount ? `<div class="event-detail-row"><span class="event-detail-key">Miktar</span><span class="event-detail-val">${amountLbl[e.toiletAmount]}</span></div>` : ''}
+        ${e.toiletConsistency ? `<div class="event-detail-row"><span class="event-detail-key">Kıvam</span><span class="event-detail-val">${escapeHtml(e.toiletConsistency)}</span></div>` : ''}`;
+      break;
+    case 'vomit':
+      detailHtml = `
+        ${e.vomitColor ? `<div class="event-detail-row"><span class="event-detail-key">Renk</span><span class="event-detail-val">${escapeHtml(e.vomitColor)}</span></div>` : ''}
+        ${e.vomitAmount ? `<div class="event-detail-row"><span class="event-detail-key">Miktar</span><span class="event-detail-val">${escapeHtml(e.vomitAmount)}</span></div>` : ''}`;
+      break;
+    case 'behavior':
+      detailHtml = `<div class="event-detail-row"><span class="event-detail-key">Davranış</span><span class="event-detail-val">${escapeHtml(e.behavior||'—')}</span></div>`;
+      break;
+    case 'health':
+      detailHtml = `<div class="event-detail-row"><span class="event-detail-key">Başlık</span><span class="event-detail-val">${escapeHtml(e.healthTitle||'—')}</span></div>`;
+      break;
+    case 'weight':
+      detailHtml = `<div class="event-detail-row"><span class="event-detail-key">Kilo</span><span class="event-detail-val">${e.kg || '?'} kg</span></div>`;
+      break;
+  }
+
+  const html = `<div class="modal-title">${typeInfo.icon} ${typeInfo.label}</div>
+    <div class="modal-subtitle">${fmtDate(date)} • ${tStr}${e.important ? ' • <span style="color: var(--warning);">⚠️ Dikkat çekici</span>' : ''}</div>
+
+    <div class="event-detail-card">
+      ${detailHtml}
+      ${e.note ? `<div class="event-detail-row"><span class="event-detail-key">Not</span><span class="event-detail-val" style="white-space: pre-wrap;">${escapeHtml(e.note)}</span></div>` : ''}
+    </div>
+
+    ${e.photo ? `<div style="margin-top: 12px; text-align: center;">
+      <img src="${e.photo}" style="max-width: 100%; max-height: 50vh; border-radius: 12px; cursor: pointer;" onclick="openImageView('${e.photo}')">
+      <div style="font-size: 11px; color: var(--text-faint); margin-top: 6px;">Fotoğrafa tıklayınca büyütür</div>
+    </div>` : ''}
+
+    <div class="modal-actions" style="flex-direction: column; gap: 8px;">
+      <button class="btn btn-secondary btn-block" onclick="goToJournalDate('${date}'); closeModal();">📖 Günlük'te Bu Güne Git</button>
+      <div style="display: flex; gap: 8px; width: 100%;">
+        ${fromVetReport ? `<button class="btn btn-secondary" onclick="reopenVetReport()" style="flex:1;">‹ Rapora Dön</button>` : ''}
+        <button class="btn btn-primary" onclick="closeModal()" style="flex:1;">Kapat</button>
+      </div>
+    </div>`;
+  openModal(html);
+}
+
+function reopenVetReport() {
+  // Re-render the report from saved state
+  if (!window._currentVetReport) { closeModal(); return; }
+  generateVetReport();
+}
+
+function goToJournalDate(date) {
+  const today = todayKey();
+  STATE.view.journalDate = date === today ? null : date;
+  goTo('journal');
+}
+
+// Veterinerere göster — paylaş
+async function shareVetReport() {
+  const r = window._currentVetReport;
+  if (!r) { toast('Önce rapor oluştur', 'error'); return; }
+
+  const moodLabels = {
+    energetic:'Enerjik', playful:'Oyuncu', calm:'Sakin',
+    tired:'Uyuşuk', hidden:'Saklandı', breathing:'Nefes sorunu',
+    vomit:'Kustu', diarrhea:'İshal'
+  };
+
+  const petName = STATE.data.profile.name || 'Bihter';
+  let text = `🐾 ${petName} - Sağlık Raporu\n`;
+  text += `📅 ${fmtDate(r.start)} - ${fmtDate(r.end)} (${r.days} gün)\n`;
+  text += `─────────────\n\n`;
+
+  text += `💊 İLAÇ UYUMU\n`;
+  text += `${r.takenDoses}/${r.totalDoses} doz alındı (${r.adherence}%)\n`;
+  if (r.totalDoses - r.takenDoses > 0) {
+    text += `⚠️ ${r.totalDoses - r.takenDoses} doz atlandı\n`;
+  }
+  text += `\n`;
+
+  text += `🍽️ BESLENME\n`;
+  text += `Toplam: ${r.totalGrams.toFixed(0)}g\n`;
+  text += `Ortalama: ${r.avgGrams}g/gün\n`;
+  text += `${r.mealDays}/${r.days} gün yedi\n\n`;
+
+  if (r.moodSummary) {
+    text += `😊 DAVRANIŞ\n${r.moodSummary}\n\n`;
+  }
+
+  if (r.events.length > 0) {
+    text += `${r.onlyImportant ? '⚠️ DİKKAT ÇEKİCİ OLAYLAR' : '📖 OLAYLAR'} (${r.events.length})\n`;
+    // Group by date
+    const byDate = {};
+    r.events.forEach(e => {
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    });
+    const sortedDates = Object.keys(byDate).sort((a,b) => b.localeCompare(a));
+    sortedDates.forEach(date => {
+      text += `\n📅 ${fmtDate(date)}\n`;
+      byDate[date].forEach(e => {
+        const t = new Date(e.time);
+        const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+        const icon = JOURNAL_TYPES[e.type]?.icon || '•';
+        const title = getJournalEntryTitle(e);
+        const detail = getJournalEntryDetail(e);
+        const flag = e.important ? ' ⚠️' : '';
+        text += `  ${tStr} ${icon} ${title}${detail ? ' - '+detail : ''}${flag}\n`;
+        if (e.note) text += `       ${e.note}\n`;
+      });
+    });
+  } else {
+    text += `📖 Bu aralıkta ${r.onlyImportant ? 'dikkat çekici bir olay yok' : 'kayıt yok'}.\n`;
+  }
+
+  text += `\n─────────────\n`;
+  text += `Bihter Sağlık uygulamasından gönderildi 🐾`;
+
+  // Try Web Share API first (iOS Safari supports it)
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `${petName} - Sağlık Raporu`,
+        text: text
+      });
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+      return;
+    }
+  }
+
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('✓ Rapor kopyalandı, istediğin yere yapıştır', 'success');
+  } catch (err) {
+    // Last resort: show in modal for manual copy
+    showShareFallback(text);
+  }
+}
+
+function showShareFallback(text) {
+  openModal(`<div class="modal-title">📋 Raporu Kopyala</div>
+    <div class="modal-subtitle">Aşağıdaki metni seç ve kopyala</div>
+    <textarea class="field-input" readonly style="height: 300px; font-family: monospace; font-size: 11px;">${escapeHtml(text)}</textarea>
+    <div class="modal-actions"><button class="btn btn-primary btn-block" onclick="closeModal()">Kapat</button></div>`);
+  // Auto-select after render
+  setTimeout(() => {
+    const ta = document.querySelector('.modal-overlay textarea');
+    if (ta) ta.select();
+  }, 100);
 }
 
 
