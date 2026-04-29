@@ -1259,7 +1259,68 @@ textarea.field-input {
 }
 
 /* ===== PHOTO INPUT ===== */
-input[type="file"] { display: none; }
+#photoInput { display: none; }
+#tPhoto { display: none; }
+#jePhoto { display: none; }
+
+.photo-picker-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  text-align: center;
+}
+.photo-picker-btn:active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-soft);
+}
+.photo-picker-btn .photo-picker-icon { font-size: 18px; }
+
+.photo-picker-buttons {
+  display: flex;
+  gap: 8px;
+}
+.photo-picker-buttons .photo-picker-btn { flex: 1; }
+
+.photo-preview {
+  margin-top: 10px;
+  position: relative;
+  display: inline-block;
+}
+.photo-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  display: block;
+}
+.photo-preview-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* ===== UTILITIES ===== */
 .divider {
@@ -3753,9 +3814,39 @@ function openTestModal() {
       <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
         ${commonParams.map(p => `<button class="mood-tag" onclick="quickAddParam('${p}')">${p}</button>`).join('')}
       </div></div>
-    <div class="field"><label class="field-label">Tahlil Fotoğrafı (Opsiyonel)</label><input class="field-input" id="tPhoto" type="file" accept="image/*" style="padding: 8px;"></div>
+    <div class="field"><label class="field-label">Tahlil Fotoğrafı / PDF (Opsiyonel)</label>
+      <input id="tPhoto" type="file" accept="image/*">
+      <input id="tPhotoCamera" type="file" accept="image/*" capture="environment" style="display:none;">
+      <div class="photo-picker-buttons">
+        <button type="button" class="photo-picker-btn" onclick="document.getElementById('tPhotoCamera').click()">
+          <span class="photo-picker-icon">📷</span> Çek
+        </button>
+        <button type="button" class="photo-picker-btn" onclick="document.getElementById('tPhoto').click()">
+          <span class="photo-picker-icon">🖼️</span> Galeri
+        </button>
+      </div>
+      <div id="tPhotoPreview" style="margin-top: 10px;"></div>
+    </div>
     <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="tNotes" placeholder="Veteriner yorumu, semptomlar..."></textarea></div>
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveTest()">Kaydet</button></div>`);
+
+  // Photo preview handlers
+  setTimeout(() => {
+    const handler = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const preview = document.getElementById('tPhotoPreview');
+        if (preview) preview.innerHTML = `<div class="photo-preview"><img src="${ev.target.result}"></div>`;
+      };
+      reader.readAsDataURL(file);
+    };
+    const g = document.getElementById('tPhoto');
+    const c = document.getElementById('tPhotoCamera');
+    if (g) g.addEventListener('change', handler);
+    if (c) c.addEventListener('change', handler);
+  }, 50);
 }
 function addTestParam() {
   const name = document.getElementById('tParamName').value.trim();
@@ -3778,10 +3869,12 @@ async function saveTest() {
   const pName = document.getElementById('tParamName').value.trim();
   const pVal = document.getElementById('tParamValue').value.trim();
   if (pName && pVal) params[pName] = pVal;
-  const photoFile = document.getElementById('tPhoto').files[0];
+  const galleryFile = document.getElementById('tPhoto').files[0];
+  const cameraFile = document.getElementById('tPhotoCamera') ? document.getElementById('tPhotoCamera').files[0] : null;
+  const photoFile = cameraFile || galleryFile;
   let photo = null;
   if (photoFile) {
-    if (photoFile.size > 3 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 3MB)', 'error'); return; }
+    if (photoFile.size > 10 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 10MB)', 'error'); return; }
     photo = await new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = ev => {
@@ -4436,9 +4529,22 @@ function openJournalTypeForm(type, existing) {
     <div class="field"><label class="field-label">Not</label>
       <textarea class="field-input" id="jeNote" placeholder="Detaylar...">${escapeHtml(e.note||'')}</textarea></div>
 
-    <div class="field"><label class="field-label">Fotoğraf</label>
-      <input class="field-input" id="jePhoto" type="file" accept="image/*" style="padding: 8px;">
-      ${e.photo ? `<div style="margin-top: 8px;"><img src="${e.photo}" style="max-width:100%; max-height: 120px; border-radius: 8px;"><div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Mevcut foto • yeni foto seçersen değişir</div></div>` : ''}</div>
+    <div class="field">
+      <label class="field-label">Fotoğraf</label>
+      <input id="jePhoto" type="file" accept="image/*">
+      <input id="jePhotoCamera" type="file" accept="image/*" capture="environment" style="display:none;">
+      <div class="photo-picker-buttons">
+        <button type="button" class="photo-picker-btn" onclick="document.getElementById('jePhotoCamera').click()">
+          <span class="photo-picker-icon">📷</span> Çek
+        </button>
+        <button type="button" class="photo-picker-btn" onclick="document.getElementById('jePhoto').click()">
+          <span class="photo-picker-icon">🖼️</span> Galeri
+        </button>
+      </div>
+      <div id="jePhotoPreview" style="margin-top: 10px;">
+        ${e.photo ? `<div class="photo-preview"><img src="${e.photo}"><button type="button" class="photo-preview-remove" onclick="clearJournalPhoto()">×</button></div>` : ''}
+      </div>
+    </div>
 
     <div class="field" style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--bg-elev); border-radius: 10px;">
       <input type="checkbox" id="jeImportant" ${e.important?'checked':''} style="width: 18px; height: 18px; accent-color: var(--accent);">
@@ -4450,6 +4556,42 @@ function openJournalTypeForm(type, existing) {
       ${existing ? `<button class="btn btn-secondary" onclick="deleteJournalEntry('${existing.id}')" style="color: var(--danger);">Sil</button>` : ''}
       <button class="btn btn-primary" onclick="saveJournalEntry('${type}', '${existing ? existing.id : ''}')">Kaydet</button>
     </div>`);
+
+  // Attach photo input handlers (called after openModal renders)
+  setTimeout(() => {
+    const galleryInp = document.getElementById('jePhoto');
+    const cameraInp = document.getElementById('jePhotoCamera');
+    if (galleryInp) galleryInp.addEventListener('change', handleJournalPhotoSelect);
+    if (cameraInp) cameraInp.addEventListener('change', handleJournalPhotoSelect);
+  }, 50);
+}
+
+function handleJournalPhotoSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    toast('Fotoğraf çok büyük (max 10MB)', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const preview = document.getElementById('jePhotoPreview');
+    if (preview) {
+      preview.innerHTML = `<div class="photo-preview"><img src="${ev.target.result}"><button type="button" class="photo-preview-remove" onclick="clearJournalPhoto()">×</button></div>`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearJournalPhoto() {
+  const preview = document.getElementById('jePhotoPreview');
+  const galleryInp = document.getElementById('jePhoto');
+  const cameraInp = document.getElementById('jePhotoCamera');
+  if (preview) preview.innerHTML = '';
+  if (galleryInp) galleryInp.value = '';
+  if (cameraInp) cameraInp.value = '';
+  // Mark as cleared so saveJournalEntry knows
+  if (preview) preview.dataset.cleared = '1';
 }
 
 async function saveJournalEntry(type, existingId) {
@@ -4504,10 +4646,14 @@ async function saveJournalEntry(type, existingId) {
       break;
   }
 
-  // Photo
-  const photoFile = document.getElementById('jePhoto').files[0];
+  // Photo — check both gallery and camera inputs
+  const galleryFile = document.getElementById('jePhoto').files[0];
+  const cameraFile = document.getElementById('jePhotoCamera').files[0];
+  const photoFile = cameraFile || galleryFile;
+  const photoCleared = document.getElementById('jePhotoPreview')?.dataset?.cleared === '1';
+
   if (photoFile) {
-    if (photoFile.size > 5 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 5MB)', 'error'); return; }
+    if (photoFile.size > 10 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 10MB)', 'error'); return; }
     const photoData = await new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = ev => {
@@ -4527,8 +4673,8 @@ async function saveJournalEntry(type, existingId) {
       reader.readAsDataURL(photoFile);
     });
     data.photo = photoData;
-  } else if (existingId) {
-    // Keep existing photo
+  } else if (existingId && !photoCleared) {
+    // Keep existing photo (only if user didn't clear it)
     const existing = (STATE.data.journal[today] || []).find(x => x.id === existingId);
     if (existing && existing.photo) data.photo = existing.photo;
   }
