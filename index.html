@@ -1613,13 +1613,45 @@ textarea.field-input {
 .journal-date-info {
   flex: 1;
   text-align: center;
-  cursor: pointer;
+  position: relative;
   border-radius: 8px;
   padding: 6px 4px;
   transition: background 0.15s;
+  cursor: pointer;
+  min-height: 44px;
 }
 .journal-date-info:active {
   background: var(--bg-elev);
+}
+
+.journal-date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.journal-date-input::-webkit-date-and-time-value { text-align: center; }
+.journal-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.journal-date-overlay {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 .journal-date-main {
   font-family: 'Fraunces', serif;
@@ -4625,11 +4657,13 @@ function renderJournal() {
     <!-- Date Navigator -->
     <div class="journal-date-nav">
       <button class="journal-nav-btn" onclick="journalChangeDate(-1)">‹</button>
-      <div class="journal-date-info" onclick="openJournalDatePicker()" title="Tarih seç">
-        <div class="journal-date-main">${fmtDate(date)} <span style="font-size: 12px; color: var(--text-faint); margin-left: 4px;">▾</span></div>
-        <div class="journal-date-sub">${isToday ? 'Bugün' : dayName}</div>
+      <div class="journal-date-info">
+        <input type="date" id="journalDatePicker" class="journal-date-input" value="${date}" max="${todayKey()}">
+        <div class="journal-date-overlay">
+          <div class="journal-date-main">${fmtDate(date)} <span style="font-size: 12px; color: var(--text-faint); margin-left: 4px;">▾</span></div>
+          <div class="journal-date-sub">${isToday ? 'Bugün' : dayName}</div>
+        </div>
       </div>
-      <input type="date" id="journalDatePicker" value="${date}" max="${todayKey()}" style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;">
       <button class="journal-nav-btn" onclick="journalChangeDate(1)" ${isToday ? 'disabled style="opacity:0.3;"' : ''}>›</button>
     </div>
     ${!isToday ? '<button class="btn btn-ghost btn-block" style="margin-bottom: 12px;" onclick="journalGoToday()">Bugüne Dön</button>' : ''}
