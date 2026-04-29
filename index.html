@@ -1738,6 +1738,22 @@ textarea.field-input {
   margin-left: 6px;
   font-size: 12px;
 }
+.journal-edit-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 8px;
+  font-weight: 600;
+}
+.journal-edit-btn:active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
 .journal-auto { opacity: 0.55; }
 .journal-auto .journal-icon { background: transparent; border-color: var(--border); }
 .journal-important { background: linear-gradient(90deg, rgba(245,179,66,0.08), transparent); margin: 0 -10px; padding: 10px; border-radius: 8px; }
@@ -2708,17 +2724,19 @@ function renderMeds() {
       html += `<div class="card"><div class="empty-state"><div class="emoji">✅</div><div class="text">Bugün bekleyen yok</div></div></div>`;
     }
     if (done.length > 0) {
-      html += `<div class="card"><div class="card-title"><span>Verilenler (${done.length})</span></div>`;
+      html += `<div class="card"><div class="card-title"><span>Verilenler (${done.length})</span><span style="color: var(--text-faint); font-size: 11px;">✎ saat düzenle</span></div>`;
+      const today = todayKey();
       html += done.map(r => {
         const t = new Date(r.takenAt);
         const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
         const d = getItemDisplay(r);
-        return `<div class="check-item done" onclick="unmarkScheduleTaken('${r.sched.id}')">
-          <div class="check-box checked"></div>
-          <div class="check-info">
+        return `<div class="check-item done">
+          <div class="check-box checked" onclick="unmarkScheduleTaken('${r.sched.id}')"></div>
+          <div class="check-info" onclick="unmarkScheduleTaken('${r.sched.id}')">
             <div class="check-name">${escapeHtml(d.name)}</div>
             <div class="check-meta">${escapeHtml(d.meta)} • ${tStr}'de</div>
           </div>
+          <button class="med-action" onclick="event.stopPropagation();editTakenScheduleTime('${r.sched.id}','${today}')" title="Saati düzenle">✎</button>
           <div class="check-time">${r.sched.time}</div>
         </div>`;
       }).join('');
@@ -2853,30 +2871,159 @@ function renderMeds() {
 }
 
 function markScheduleTaken(scheduleId) {
+  // Bugüne markla — quick mode (no time prompt)
+  markScheduleTakenForDate(scheduleId, todayKey(), { quick: true });
+}
+
+function markScheduleTakenForDate(scheduleId, date, options) {
+  options = options || {};
   const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
   if (!sched) return;
+  const today = todayKey();
+  const isToday = date === today;
 
-  // Mama tipi ise gram sor
+  // Mama tipi ise gram sor (bu modal zaten saat sorabilir hale getireceğim)
   if (sched.type === 'meal') {
-    openMealTakenModal(sched);
+    openMealTakenModal(sched, date);
     return;
   }
 
-  // İlaç tipi (default)
-  const med = STATE.data.meds.find(m => m.id === sched.medId);
-  const today = todayKey();
-  if (!STATE.data.medLogs[today]) STATE.data.medLogs[today] = {};
-  STATE.data.medLogs[today][scheduleId] = Date.now();
-  if (med && med.stock) {
-    med.stock = Math.max(0, parseFloat(med.stock) - parseFloat(sched.perDose||1)).toString();
+  // Eğer bugün ve quick mode ise → şu anı kaydet, sormadan
+  if (isToday && options.quick) {
+    if (!STATE.data.medLogs[date]) STATE.data.medLogs[date] = {};
+    STATE.data.medLogs[date][scheduleId] = Date.now();
+    const med = STATE.data.meds.find(m => m.id === sched.medId);
+    if (med && med.stock) {
+      med.stock = Math.max(0, parseFloat(med.stock) - parseFloat(sched.perDose||1)).toString();
+    }
+    queueSave();
+    toast('✓ ' + (med ? med.name : 'İlaç') + ' verildi', 'success');
+    renderHome();
+    if (STATE.view.currentScreen === 'meds') renderMeds();
+    if (STATE.view.currentScreen === 'journal') renderJournal();
+    return;
   }
-  queueSave();
-  toast('✓ ' + (med ? med.name : 'İlaç') + ' verildi', 'success');
-  renderHome();
-  if (STATE.view.currentScreen === 'meds') renderMeds();
+
+  // Geçmiş gün ya da düzenleme — saat sor
+  openScheduleTakenTimeModal(scheduleId, date, sched.time);
 }
 
-function openMealTakenModal(sched) {
+function openScheduleTakenTimeModal(scheduleId, date, defaultTime) {
+  const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
+  if (!sched) return;
+  let title, subtitle;
+  if (sched.type === 'meal') {
+    title = '🍽️ Mama Verildi';
+    subtitle = fmtDate(date) + ' • Saat kaçtaydı?';
+  } else {
+    const med = STATE.data.meds.find(m => m.id === sched.medId);
+    title = '💊 ' + (med ? med.name : 'İlaç') + ' Verildi';
+    subtitle = fmtDate(date) + ' • Saat kaçtaydı?';
+  }
+
+  openModal(`<div class="modal-title">${title}</div>
+    <div class="modal-subtitle">${subtitle}</div>
+    <div class="field"><label class="field-label">Saat</label>
+      <input class="field-input" id="schedTakenTime" type="time" value="${defaultTime || sched.time}" autofocus style="font-family: 'Fraunces', serif; font-size: 24px; text-align: center;"></div>
+    <div style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px; line-height: 1.5;">Planlanan saat: ${sched.time}</div>
+    ${sched.type === 'meal' ? `
+    <div class="field">
+      <label class="field-label">Gerçek Miktar (gram)</label>
+      <input class="field-input" id="mealTakenGrams" type="number" step="1" inputmode="decimal" value="${sched.expectedGrams||''}" placeholder="ör: 30" style="font-family: 'Fraunces', serif; font-size: 20px; text-align: center;">
+    </div>
+    <div class="gram-quick-btns" style="margin-top: 8px;">
+      <button class="gram-quick-btn" onclick="quickGramInModal(10)">10g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(20)">20g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(30)">30g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(50)">50g</button>
+    </div>` : ''}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      ${sched.type === 'meal' ? `<button class="btn btn-secondary" onclick="confirmNoMealForDate('${scheduleId}','${date}')" style="color: var(--danger);">Yemedi</button>` : ''}
+      <button class="btn btn-primary" onclick="confirmScheduleTakenAtTime('${scheduleId}','${date}')">Kaydet</button>
+    </div>`);
+}
+
+function confirmScheduleTakenAtTime(scheduleId, date) {
+  const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
+  if (!sched) return;
+  const timeStr = document.getElementById('schedTakenTime').value;
+  if (!timeStr) { toast('Saat seç', 'error'); return; }
+  const [h, mi] = timeStr.split(':').map(Number);
+  const d = parseDate(date); d.setHours(h, mi, 0, 0);
+  const timestamp = d.getTime();
+
+  // Schedule'ı işaretle
+  if (!STATE.data.medLogs[date]) STATE.data.medLogs[date] = {};
+  STATE.data.medLogs[date][scheduleId] = timestamp;
+
+  if (sched.type === 'meal') {
+    // Mama girişini de ekle
+    const grams = parseFloat(document.getElementById('mealTakenGrams').value);
+    if (!grams || grams <= 0) { toast('Gram girişi gerekli', 'error'); return; }
+    if (!STATE.data.mealEntries[date]) STATE.data.mealEntries[date] = [];
+    // Mevcut fromSchedule girişi varsa güncelle, yoksa ekle
+    const existingIdx = STATE.data.mealEntries[date].findIndex(e => e.fromSchedule === scheduleId);
+    const entry = { id: existingIdx >= 0 ? STATE.data.mealEntries[date][existingIdx].id : uid(), time: timestamp, grams, fromSchedule: scheduleId };
+    if (existingIdx >= 0) STATE.data.mealEntries[date][existingIdx] = entry;
+    else STATE.data.mealEntries[date].push(entry);
+    queueSave();
+    closeModal();
+    toast(`✓ ${grams}g mama kaydedildi (${timeStr})`, 'success');
+  } else {
+    // İlaç stok düş (sadece yeni kayıt için)
+    const wasNew = !STATE.data.medLogs[date][scheduleId] || true; // simplification - always was just-set
+    const med = STATE.data.meds.find(m => m.id === sched.medId);
+    if (med && med.stock) {
+      med.stock = Math.max(0, parseFloat(med.stock) - parseFloat(sched.perDose||1)).toString();
+    }
+    queueSave();
+    closeModal();
+    toast(`✓ ${med ? med.name : 'İlaç'} ${timeStr}'de verildi`, 'success');
+  }
+
+  renderAll();
+}
+
+function confirmNoMealForDate(scheduleId, date) {
+  if (!confirm('Mama yemedi olarak işaretle?')) return;
+  const timeStr = document.getElementById('schedTakenTime').value || '00:00';
+  const [h, mi] = timeStr.split(':').map(Number);
+  const d = parseDate(date); d.setHours(h, mi, 0, 0);
+  if (!STATE.data.medLogs[date]) STATE.data.medLogs[date] = {};
+  STATE.data.medLogs[date][scheduleId] = d.getTime();
+  // mealEntries'e EKLEME (yedi diye)
+  // Notu güncelle
+  if (!STATE.data.moods[date]) STATE.data.moods[date] = { tags: [], note: '' };
+  const sched = STATE.data.medSchedule.find(s => s.id === scheduleId);
+  const newNote = `${sched ? sched.time : ''} mamasını yemedi`;
+  STATE.data.moods[date].note = (STATE.data.moods[date].note ? STATE.data.moods[date].note + ' • ' : '') + newNote;
+  queueSave();
+  closeModal();
+  toast('🔴 Yemedi olarak kaydedildi');
+  renderAll();
+}
+
+// Verilen dozun saatini düzenle
+function editTakenScheduleTime(scheduleId, date) {
+  const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
+  if (!sched) return;
+  const log = STATE.data.medLogs[date] || {};
+  const takenAt = log[scheduleId];
+  if (!takenAt) return;
+  const t = new Date(takenAt);
+  const defaultTime = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+  openScheduleTakenTimeModal(scheduleId, date, defaultTime);
+}
+
+function openMealTakenModal(sched, date) {
+  date = date || todayKey();
+  const today = todayKey();
+  // Geçmiş ise saat soran modal'ı aç
+  if (date !== today) {
+    openScheduleTakenTimeModal(sched.id, date, sched.time);
+    return;
+  }
   const expectedGrams = sched.expectedGrams || '';
   openModal(`<div class="modal-title">🍽️ Mama Verildi</div>
     <div class="modal-subtitle">Saat ${sched.time} • Bihter ne kadar yedi?</div>
@@ -2897,7 +3044,6 @@ function openMealTakenModal(sched) {
       <button class="btn btn-secondary" onclick="confirmNoMeal('${sched.id}')" style="color: var(--danger);">Yemedi</button>
       <button class="btn btn-primary" onclick="confirmMealTaken('${sched.id}')">Kaydet</button>
     </div>`);
-  // Auto-focus the input
   setTimeout(() => {
     const inp = document.getElementById('mealTakenGrams');
     if (inp) { inp.focus(); inp.select(); }
@@ -3033,10 +3179,10 @@ function renderMealsToday() {
         : sorted.map(e => {
             const t = new Date(e.time);
             const tStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
-            return `<div class="meal-entry-row">
+            return `<div class="meal-entry-row" style="cursor:pointer;" onclick="editMealEntry('${e.id}','${todayKey()}')">
               <div class="meal-entry-time">${tStr}</div>
               <div class="meal-entry-amount">${e.grams} <span style="font-size: 12px; color: var(--text-dim);">g</span></div>
-              <div class="meal-entry-delete" onclick="deleteMealEntry('${e.id}')">×</div>
+              <div class="meal-entry-delete" onclick="event.stopPropagation();deleteMealEntry('${e.id}')">×</div>
             </div>`;
           }).join('')}
     </div>
@@ -3206,6 +3352,64 @@ function deleteMealEntry(id) {
     if (STATE.data.mealEntries[today].length === 0) delete STATE.data.mealEntries[today];
   }
   queueSave(); renderMeals(); renderHome(); toast('Silindi');
+}
+
+function editMealEntry(id, date) {
+  date = date || todayKey();
+  const entries = STATE.data.mealEntries[date] || [];
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  const t = new Date(entry.time);
+  const tStr = String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0');
+
+  // If this entry is from a journal entry or schedule, edit those instead
+  if (entry.fromJournal) {
+    openJournalEntryModal(entry.fromJournal);
+    return;
+  }
+  if (entry.fromSchedule) {
+    editTakenScheduleTime(entry.fromSchedule, date);
+    return;
+  }
+
+  // Manual entry — show edit modal
+  openModal(`<div class="modal-title">🍽️ Mama Girişini Düzenle</div>
+    <div class="modal-subtitle">${fmtDate(date)}</div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Saat</label>
+        <input class="field-input" id="mEditTime" type="time" value="${tStr}"></div>
+      <div class="field"><label class="field-label">Gram</label>
+        <input class="field-input" id="mEditGrams" type="number" step="1" value="${entry.grams}" autofocus></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      <button class="btn btn-secondary" onclick="deleteMealEntryFromDate('${date}','${id}')" style="color: var(--danger);">Sil</button>
+      <button class="btn btn-primary" onclick="saveMealEntryEdit('${date}','${id}')">Kaydet</button>
+    </div>`);
+}
+
+function saveMealEntryEdit(date, id) {
+  const grams = parseFloat(document.getElementById('mEditGrams').value);
+  const timeStr = document.getElementById('mEditTime').value;
+  if (!grams || grams <= 0) { toast('Gram girişi gerekli', 'error'); return; }
+  if (!timeStr) { toast('Saat gerekli', 'error'); return; }
+  const [h, mi] = timeStr.split(':').map(Number);
+  const d = parseDate(date); d.setHours(h, mi, 0, 0);
+  const entries = STATE.data.mealEntries[date] || [];
+  const idx = entries.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  entries[idx].grams = grams;
+  entries[idx].time = d.getTime();
+  queueSave(); closeModal(); toast('Güncellendi', 'success'); renderAll();
+}
+
+function deleteMealEntryFromDate(date, id) {
+  if (!confirm('Bu mama girişini sil?')) return;
+  if (STATE.data.mealEntries[date]) {
+    STATE.data.mealEntries[date] = STATE.data.mealEntries[date].filter(e => e.id !== id);
+    if (STATE.data.mealEntries[date].length === 0) delete STATE.data.mealEntries[date];
+  }
+  queueSave(); closeModal(); toast('Silindi'); renderAll();
 }
 
 function renderAppetiteChart() {
@@ -4179,8 +4383,8 @@ function renderJournal() {
       <button class="btn btn-secondary btn-block" style="margin-top: 12px;" onclick="openVetReportModal()">📋 Veterinere Göster</button>
     </div>
 
-    <!-- Mood + Note quick controls (only for today) -->
-    ${isToday ? renderJournalMoodSection() : ''}
+    <!-- Mood + Note (works for all days) -->
+    ${renderJournalMoodSection(date)}
 
     <!-- Timeline -->
     <div class="card">
@@ -4189,22 +4393,26 @@ function renderJournal() {
         ${items.length > 0 ? `<span style="color: var(--text-faint); font-size: 11px;">${items.length} olay</span>` : ''}
       </div>
       ${items.length === 0
-        ? `<div class="empty-state"><div class="emoji">📖</div><div class="text">Bu gün için kayıt yok</div>${isToday ? '<button class="btn btn-primary" style="margin-top: 12px;" onclick="openJournalEntryModal()">+ İlk Olayı Ekle</button>' : ''}</div>`
+        ? `<div class="empty-state"><div class="emoji">📖</div><div class="text">Bu gün için kayıt yok</div><button class="btn btn-primary" style="margin-top: 12px;" onclick="openJournalEntryModal()">+ İlk Olayı Ekle</button></div>`
         : items.map(renderJournalItem).join('')
       }
     </div>
+
+    <!-- Pending meds for this day (allow late-marking past doses) -->
+    ${renderJournalPendingMeds(date)}
   `;
 
   document.getElementById('journalContent').innerHTML = html;
 
-  // Hide + button when not today
+  // + button always visible (now supports past dates too)
   const addBtn = document.getElementById('journalAddBtn');
-  if (addBtn) addBtn.style.display = isToday ? '' : 'none';
+  if (addBtn) addBtn.style.display = '';
 }
 
-function renderJournalMoodSection() {
+function renderJournalMoodSection(date) {
   const today = todayKey();
-  const m = STATE.data.moods[today] || { tags: [], note: '' };
+  const isToday = date === today;
+  const m = STATE.data.moods[date] || { tags: [], note: '' };
   const moods = [
     {key:'energetic', label:'⚡ Enerjik'},
     {key:'playful', label:'🎾 Oyuncu'},
@@ -4214,18 +4422,18 @@ function renderJournalMoodSection() {
     {key:'breathing', label:'😮‍💨 Nefes Sorunu'}
   ];
   return `<div class="card">
-    <div class="card-title"><span>Bugün Nasıldı?</span></div>
+    <div class="card-title"><span>${isToday ? 'Bugün' : 'O Gün'} Nasıldı?</span></div>
     <div class="mood-tags" id="journalMoodTags">
-      ${moods.map(mood => `<div class="mood-tag ${m.tags.includes(mood.key)?'active':''}" data-mood="${mood.key}" onclick="toggleJournalMood('${mood.key}')">${mood.label}</div>`).join('')}
+      ${moods.map(mood => `<div class="mood-tag ${m.tags.includes(mood.key)?'active':''}" data-mood="${mood.key}" onclick="toggleJournalMood('${mood.key}','${date}')">${mood.label}</div>`).join('')}
     </div>
-    <textarea class="note-input" id="journalDailyNote" placeholder="Bugünden notlar...">${escapeHtml(m.note||'')}</textarea>
+    <textarea class="note-input" id="journalDailyNote" data-date="${date}" placeholder="${isToday ? 'Bugünden' : 'O günden'} notlar...">${escapeHtml(m.note||'')}</textarea>
   </div>`;
 }
 
-function toggleJournalMood(mood) {
-  const today = todayKey();
-  if (!STATE.data.moods[today]) STATE.data.moods[today] = { tags: [], note: '' };
-  const tags = STATE.data.moods[today].tags;
+function toggleJournalMood(mood, date) {
+  if (!date) date = getCurrentJournalDate();
+  if (!STATE.data.moods[date]) STATE.data.moods[date] = { tags: [], note: '' };
+  const tags = STATE.data.moods[date].tags;
   const idx = tags.indexOf(mood);
   if (idx >= 0) tags.splice(idx, 1); else tags.push(mood);
   queueSave();
@@ -4237,13 +4445,61 @@ function toggleJournalMood(mood) {
 let journalNoteDebounce = null;
 document.addEventListener('input', e => {
   if (e.target && e.target.id === 'journalDailyNote') {
-    const today = todayKey();
-    if (!STATE.data.moods[today]) STATE.data.moods[today] = { tags: [], note: '' };
-    STATE.data.moods[today].note = e.target.value;
+    const date = e.target.dataset.date || getCurrentJournalDate();
+    if (!STATE.data.moods[date]) STATE.data.moods[date] = { tags: [], note: '' };
+    STATE.data.moods[date].note = e.target.value;
     clearTimeout(journalNoteDebounce);
     journalNoteDebounce = setTimeout(queueSave, 600);
   }
 });
+
+function renderJournalPendingMeds(date) {
+  // Show medications/meals from schedule that weren't logged on this date
+  const schedule = STATE.data.medSchedule || [];
+  const log = STATE.data.medLogs[date] || {};
+  if (schedule.length === 0) return '';
+
+  const pending = schedule.filter(s => {
+    if (log[s.id]) return false;
+    if (s.type === 'meal') return true;
+    const med = STATE.data.meds.find(m => m.id === s.medId);
+    return med && med.active;
+  }).sort((a,b) => a.time.localeCompare(b.time));
+
+  if (pending.length === 0) return '';
+
+  const today = todayKey();
+  const isToday = date === today;
+  const stomachIcon = { empty: '🍃', full: '🍽️' };
+
+  return `<div class="card">
+    <div class="card-title">
+      <span>${isToday ? 'Bekleyen Doz' : 'O Gün Tikenmemiş'} (${pending.length})</span>
+    </div>
+    <div style="font-size: 12px; color: var(--text-faint); margin-bottom: 10px; line-height: 1.5;">
+      ${isToday ? 'Tikleyince saat kaçta verildiğini sorar' : 'Geçmişe dönük olarak tikleyebilirsin — saat kaçta verildiğini soracak'}
+    </div>
+    ${pending.map(s => {
+      let name, meta;
+      if (s.type === 'meal') {
+        name = '🍽️ Mama';
+        meta = s.expectedGrams ? `Yaklaşık ${s.expectedGrams}g` : 'Mama saati';
+      } else {
+        const med = STATE.data.meds.find(m => m.id === s.medId);
+        name = med ? med.name : '?';
+        meta = (s.dose||'') + (s.stomach ? ' • '+stomachIcon[s.stomach] : '');
+      }
+      return `<div class="check-item" onclick="markScheduleTakenForDate('${s.id}','${date}')">
+        <div class="check-box"></div>
+        <div class="check-info">
+          <div class="check-name">${escapeHtml(name)}</div>
+          <div class="check-meta">${escapeHtml(meta)}</div>
+        </div>
+        <div class="check-time">${s.time}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 
 function buildJournalTimeline(date) {
   const items = [];
@@ -4265,7 +4521,8 @@ function buildJournalTimeline(date) {
       icon: '💊',
       title: med ? med.name : '?',
       detail: (sched.dose||'') + (sched.stomach==='empty'?' • aç':sched.stomach==='full'?' • tok':''),
-      auto: true
+      auto: true,
+      scheduleId: scheduleId
     });
   });
 
@@ -4346,6 +4603,19 @@ function renderJournalItem(it) {
   const autoClass = it.auto ? 'journal-auto' : 'journal-manual';
   const flagClass = it.important ? 'journal-important' : '';
   const clickHandler = it.manual ? `onclick="openJournalEntryModal('${it.entryId}')"` : '';
+  const date = getCurrentJournalDate();
+
+  // Edit button for auto-med items (lets user fix the time)
+  let editBtn = '';
+  if (it.type === 'auto-med' && it.scheduleId) {
+    editBtn = `<button class="journal-edit-btn" onclick="event.stopPropagation();editTakenScheduleTime('${it.scheduleId}','${date}')" title="Saati düzenle">✎</button>`;
+  } else if (it.type === 'auto-meal' && it.fromSchedule) {
+    editBtn = `<button class="journal-edit-btn" onclick="event.stopPropagation();editTakenScheduleTime('${it.fromSchedule}','${date}')" title="Saati düzenle">✎</button>`;
+  } else if (it.type === 'auto-meal' && it.sourceId) {
+    // Manual meal entry from yemek tab - allow editing
+    editBtn = `<button class="journal-edit-btn" onclick="event.stopPropagation();editMealEntry('${it.sourceId}','${date}')" title="Düzenle">✎</button>`;
+  }
+
   return `<div class="journal-item ${autoClass} ${flagClass}" ${clickHandler}>
     <div class="journal-time">${tStr}</div>
     <div class="journal-icon-col">
@@ -4355,6 +4625,7 @@ function renderJournalItem(it) {
       <div class="journal-title">
         ${escapeHtml(it.title)}
         ${it.important ? '<span class="journal-flag">⚠️</span>' : ''}
+        ${editBtn}
       </div>
       ${it.detail ? `<div class="journal-detail">${escapeHtml(it.detail)}</div>` : ''}
       ${it.note ? `<div class="journal-note-text">${escapeHtml(it.note)}</div>` : ''}
@@ -4419,22 +4690,28 @@ function journalGoToday() {
 // JOURNAL ENTRY MODAL
 // ============================================================
 function openJournalEntryModal(entryId) {
-  const today = todayKey();
-  const entries = STATE.data.journal[today] || [];
-  const e = entryId ? entries.find(x => x.id === entryId) : null;
+  const date = getCurrentJournalDate();
+  // Search for entry across all dates if editing
+  let e = null;
+  let entryDate = date;
+  if (entryId) {
+    for (const d of Object.keys(STATE.data.journal || {})) {
+      const found = (STATE.data.journal[d] || []).find(x => x.id === entryId);
+      if (found) { e = found; entryDate = d; break; }
+    }
+  }
 
   if (e) {
-    // Edit existing — show type-specific form directly
-    openJournalTypeForm(e.type, e);
+    openJournalTypeForm(e.type, e, entryDate);
     return;
   }
 
   // Show type picker
   let html = `<div class="modal-title">Yeni Olay Ekle</div>
-    <div class="modal-subtitle">Ne oldu?</div>
+    <div class="modal-subtitle">${fmtDate(date)} • Ne oldu?</div>
     <div class="journal-type-grid">`;
   Object.entries(JOURNAL_TYPES).forEach(([key, t]) => {
-    html += `<button class="journal-type-btn" onclick="openJournalTypeForm('${key}')">
+    html += `<button class="journal-type-btn" onclick="openJournalTypeForm('${key}', null, '${date}')">
       <div class="journal-type-icon">${t.icon}</div>
       <div class="journal-type-label">${t.label}</div>
     </button>`;
@@ -4444,9 +4721,14 @@ function openJournalEntryModal(entryId) {
   openModal(html);
 }
 
-function openJournalTypeForm(type, existing) {
+function openJournalTypeForm(type, existing, defaultDate) {
   const e = existing || { id: '', time: Date.now(), type, important: false };
   const t = JOURNAL_TYPES[type];
+  const today = todayKey();
+  // Determine the date for this entry (existing's date if edit, else default/current)
+  const entryDate = existing
+    ? (Object.keys(STATE.data.journal).find(d => (STATE.data.journal[d]||[]).some(x => x.id === existing.id)) || today)
+    : (defaultDate || getCurrentJournalDate());
   const nowStr = (() => {
     const d = new Date(e.time || Date.now());
     return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -4519,10 +4801,14 @@ function openJournalTypeForm(type, existing) {
   }
 
   openModal(`<div class="modal-title">${t.icon} ${t.label} ${existing?'Düzenle':'Ekle'}</div>
-    <div class="modal-subtitle">${fmtDate(todayKey())} için olay</div>
+    <div class="modal-subtitle">${entryDate === today ? 'Bugün' : 'Geçmiş gün'} için olay</div>
 
-    <div class="field"><label class="field-label">Saat</label>
-      <input class="field-input" id="jeTime" type="time" value="${nowStr}"></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Tarih</label>
+        <input class="field-input" id="jeDate" type="date" value="${entryDate}" max="${today}"></div>
+      <div class="field"><label class="field-label">Saat</label>
+        <input class="field-input" id="jeTime" type="time" value="${nowStr}"></div>
+    </div>
 
     ${typeFields}
 
@@ -4553,8 +4839,8 @@ function openJournalTypeForm(type, existing) {
 
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
-      ${existing ? `<button class="btn btn-secondary" onclick="deleteJournalEntry('${existing.id}')" style="color: var(--danger);">Sil</button>` : ''}
-      <button class="btn btn-primary" onclick="saveJournalEntry('${type}', '${existing ? existing.id : ''}')">Kaydet</button>
+      ${existing ? `<button class="btn btn-secondary" onclick="deleteJournalEntry('${existing.id}','${entryDate}')" style="color: var(--danger);">Sil</button>` : ''}
+      <button class="btn btn-primary" onclick="saveJournalEntry('${type}', '${existing ? existing.id : ''}', '${entryDate}')">Kaydet</button>
     </div>`);
 
   // Attach photo input handlers (called after openModal renders)
@@ -4594,12 +4880,13 @@ function clearJournalPhoto() {
   if (preview) preview.dataset.cleared = '1';
 }
 
-async function saveJournalEntry(type, existingId) {
-  const today = todayKey();
+async function saveJournalEntry(type, existingId, formDate) {
+  // Tarihi formdan al — geçmiş tarih olabilir
+  const dateInp = document.getElementById('jeDate');
+  const date = (dateInp && dateInp.value) ? dateInp.value : (formDate || todayKey());
   const timeStr = document.getElementById('jeTime').value;
-  // Combine today's date with the time
   const [h, mi] = timeStr.split(':').map(Number);
-  const d = new Date(); d.setHours(h, mi, 0, 0);
+  const d = parseDate(date); d.setHours(h, mi, 0, 0);
   const time = d.getTime();
 
   const note = document.getElementById('jeNote').value.trim();
@@ -4623,13 +4910,12 @@ async function saveJournalEntry(type, existingId) {
       data.toiletKind = document.getElementById('jeToiletKind').value;
       data.toiletAmount = document.getElementById('jeToiletAmount').value;
       data.toiletConsistency = document.getElementById('jeToiletConsistency').value;
-      // Auto-flag if "sulu/ishal"
       if (data.toiletConsistency === 'sulu') data.important = true;
       break;
     case 'vomit':
       data.vomitColor = document.getElementById('jeVomitColor').value.trim();
       data.vomitAmount = document.getElementById('jeVomitAmount').value;
-      data.important = true; // always flag vomiting
+      data.important = true;
       break;
     case 'behavior':
       data.behavior = document.getElementById('jeBehavior').value.trim();
@@ -4674,33 +4960,49 @@ async function saveJournalEntry(type, existingId) {
     });
     data.photo = photoData;
   } else if (existingId && !photoCleared) {
-    // Keep existing photo (only if user didn't clear it)
-    const existing = (STATE.data.journal[today] || []).find(x => x.id === existingId);
+    // Keep existing photo — search across all dates
+    let existing = null;
+    for (const d of Object.keys(STATE.data.journal || {})) {
+      existing = (STATE.data.journal[d] || []).find(x => x.id === existingId);
+      if (existing) break;
+    }
     if (existing && existing.photo) data.photo = existing.photo;
   }
 
-  // Save
-  if (!STATE.data.journal[today]) STATE.data.journal[today] = [];
+  // Eğer düzenleme ise eski tarihten sil (tarih değişmiş olabilir)
   if (existingId) {
-    const idx = STATE.data.journal[today].findIndex(x => x.id === existingId);
-    if (idx >= 0) STATE.data.journal[today][idx] = data;
-    else STATE.data.journal[today].push(data);
-  } else {
-    STATE.data.journal[today].push(data);
+    for (const d of Object.keys(STATE.data.journal || {})) {
+      STATE.data.journal[d] = (STATE.data.journal[d] || []).filter(x => x.id !== existingId);
+      if (STATE.data.journal[d].length === 0) delete STATE.data.journal[d];
+    }
+    // Side-effect cleanup: meal/water entries
+    if (type === 'meal' || type === 'water') {
+      for (const d of Object.keys(STATE.data.mealEntries || {})) {
+        STATE.data.mealEntries[d] = (STATE.data.mealEntries[d] || []).filter(m => m.fromJournal !== existingId);
+        if (STATE.data.mealEntries[d].length === 0) delete STATE.data.mealEntries[d];
+      }
+    }
   }
+
+  // Save to selected date
+  if (!STATE.data.journal[date]) STATE.data.journal[date] = [];
+  STATE.data.journal[date].push(data);
 
   // Side-effects: feed other systems
   if (type === 'meal') {
-    if (!STATE.data.mealEntries[today]) STATE.data.mealEntries[today] = [];
-    STATE.data.mealEntries[today].push({ id: uid(), time, grams: data.grams, fromJournal: data.id });
+    if (!STATE.data.mealEntries[date]) STATE.data.mealEntries[date] = [];
+    STATE.data.mealEntries[date].push({ id: uid(), time, grams: data.grams, fromJournal: data.id });
   }
   if (type === 'water') {
-    STATE.data.waterLogs[today] = (STATE.data.waterLogs[today] || 0) + data.amount;
+    STATE.data.waterLogs[date] = (STATE.data.waterLogs[date] || 0) + data.amount;
   }
   if (type === 'weight') {
-    STATE.data.weights = STATE.data.weights.filter(w => w.date !== today);
-    STATE.data.weights.push({ date: today, kg: data.kg.toString() });
+    STATE.data.weights = STATE.data.weights.filter(w => w.date !== date);
+    STATE.data.weights.push({ date, kg: data.kg.toString() });
   }
+
+  // Set journal view to this date so user sees it
+  STATE.view.journalDate = date === todayKey() ? null : date;
 
   queueSave();
   closeModal();
@@ -4708,26 +5010,26 @@ async function saveJournalEntry(type, existingId) {
   renderAll();
 }
 
-function deleteJournalEntry(id) {
+function deleteJournalEntry(id, date) {
   if (!confirm('Bu olayı sil?')) return;
-  const today = todayKey();
-  const entries = STATE.data.journal[today] || [];
+  date = date || todayKey();
+  const entries = STATE.data.journal[date] || [];
   const e = entries.find(x => x.id === id);
   if (!e) return;
 
   // Reverse side-effects
   if (e.type === 'meal') {
-    if (STATE.data.mealEntries[today]) {
-      STATE.data.mealEntries[today] = STATE.data.mealEntries[today].filter(m => m.fromJournal !== id);
-      if (STATE.data.mealEntries[today].length === 0) delete STATE.data.mealEntries[today];
+    if (STATE.data.mealEntries[date]) {
+      STATE.data.mealEntries[date] = STATE.data.mealEntries[date].filter(m => m.fromJournal !== id);
+      if (STATE.data.mealEntries[date].length === 0) delete STATE.data.mealEntries[date];
     }
   }
   if (e.type === 'water') {
-    STATE.data.waterLogs[today] = Math.max(0, (STATE.data.waterLogs[today] || 0) - (e.amount || 0));
+    STATE.data.waterLogs[date] = Math.max(0, (STATE.data.waterLogs[date] || 0) - (e.amount || 0));
   }
-  // weight: don't reverse (could affect other things)
 
-  STATE.data.journal[today] = entries.filter(x => x.id !== id);
+  STATE.data.journal[date] = entries.filter(x => x.id !== id);
+  if (STATE.data.journal[date].length === 0) delete STATE.data.journal[date];
   queueSave();
   closeModal();
   toast('Silindi');
