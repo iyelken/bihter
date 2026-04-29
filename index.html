@@ -1508,6 +1508,25 @@ input[type="file"] { display: none; }
 .med-history-name { flex: 1; font-weight: 500; }
 .med-history-dose { font-size: 11px; color: var(--text-faint); }
 
+/* ===== TYPE TOGGLE BUTTONS ===== */
+.type-btn {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.type-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-soft);
+}
+
 /* ===== MOBILE OPTIMIZATIONS ===== */
 @media (max-width: 360px) {
   .screen { padding-left: 16px; padding-right: 16px; }
@@ -2092,6 +2111,7 @@ function renderHome() {
   const todayMedLog = STATE.data.medLogs[today] || {};
   const schedule = STATE.data.medSchedule || [];
   const activeSchedule = schedule.filter(s => {
+    if (s.type === 'meal') return false; // mama'yı ilaç sayacına dahil etme
     const med = STATE.data.meds.find(m => m.id === s.medId);
     return med && med.active;
   });
@@ -2129,7 +2149,8 @@ function renderTodayMedsList() {
   const schedule = STATE.data.medSchedule || [];
   const medById = id => STATE.data.meds.find(m => m.id === id);
 
-  if (STATE.data.meds.filter(m => m.active).length === 0) {
+  // Eğer hiçbir şey yoksa (ne ilaç ne takvim)
+  if (STATE.data.meds.filter(m => m.active).length === 0 && schedule.length === 0) {
     document.getElementById('todayMedsList').innerHTML = `<div class="empty-state"><div class="emoji">💊</div><div class="text">Henüz ilaç tanımlanmadı</div><button class="btn btn-ghost" style="margin-top: 12px;" onclick="goTo('meds')">İlaçlar Sekmesine Git</button></div>`;
     return;
   }
@@ -2138,14 +2159,16 @@ function renderTodayMedsList() {
     return;
   }
 
-  // Filter pending only
+  // Filter pending only — both meds and meals
   const pending = schedule.filter(s => {
+    if (log[s.id]) return false; // already done
+    if (s.type === 'meal') return true; // meals always pending if not done
     const med = medById(s.medId);
-    return med && med.active && !log[s.id];
+    return med && med.active;
   }).sort((a,b) => a.time.localeCompare(b.time));
 
   if (pending.length === 0) {
-    document.getElementById('todayMedsList').innerHTML = `<div class="empty-state"><div class="emoji">✅</div><div class="text">Bugünün tüm ilaçları verildi!</div><div style="margin-top: 8px; font-size: 12px;">Geçmiş için <span style="color: var(--accent); cursor: pointer;" onclick="goTo('meds')">İlaç sekmesi ›</span></div></div>`;
+    document.getElementById('todayMedsList').innerHTML = `<div class="empty-state"><div class="emoji">✅</div><div class="text">Bugünün tüm planı tamamlandı!</div><div style="margin-top: 8px; font-size: 12px;">Geçmiş için <span style="color: var(--accent); cursor: pointer;" onclick="goTo('meds')">İlaç sekmesi ›</span></div></div>`;
     return;
   }
 
@@ -2155,8 +2178,19 @@ function renderTodayMedsList() {
   const stomachLabel = { empty: 'Aç karnına', full: 'Tok karnına' };
 
   const next = pending[0];
-  const nextMed = medById(next.medId);
   const rest = pending.slice(1, 4);
+
+  // Render NEXT card (ilaç veya mama)
+  let nextName, nextDose, nextStomach = '';
+  if (next.type === 'meal') {
+    nextName = '🍽️ Mama';
+    nextDose = next.expectedGrams ? `Yaklaşık ${next.expectedGrams}g` : 'Bihter\'in mama saati';
+  } else {
+    const nextMed = medById(next.medId);
+    nextName = nextMed ? nextMed.name : '?';
+    nextDose = next.dose || '';
+    if (next.stomach) nextStomach = stomachIcon[next.stomach] + ' ' + stomachLabel[next.stomach];
+  }
 
   let html = `
     <div class="next-med-card" onclick="markScheduleTaken('${next.id}')">
@@ -2165,22 +2199,30 @@ function renderTodayMedsList() {
         <div class="next-med-time-label">${next.time < nowStr ? 'gecikti' : 'sıradaki'}</div>
       </div>
       <div class="next-med-info">
-        <div class="next-med-name">${escapeHtml(nextMed.name)}</div>
-        <div class="next-med-dose">${escapeHtml(next.dose || '')}</div>
-        ${next.stomach ? `<div class="next-med-stomach">${stomachIcon[next.stomach]} ${stomachLabel[next.stomach]}</div>` : ''}
+        <div class="next-med-name">${escapeHtml(nextName)}</div>
+        <div class="next-med-dose">${escapeHtml(nextDose)}</div>
+        ${nextStomach ? `<div class="next-med-stomach">${nextStomach}</div>` : ''}
       </div>
-      <div class="next-med-check">✓</div>
+      <div class="next-med-check">${next.type === 'meal' ? '🍽️' : '✓'}</div>
     </div>`;
 
   if (rest.length > 0) {
     html += `<div style="margin-top: 12px; font-size: 11px; color: var(--text-faint); letter-spacing: 0.1em; text-transform: uppercase; padding-left: 4px;">Sırada</div>`;
     html += rest.map(s => {
-      const med = medById(s.medId);
+      let name, meta;
+      if (s.type === 'meal') {
+        name = '🍽️ Mama';
+        meta = s.expectedGrams ? `Yaklaşık ${s.expectedGrams}g` : 'Mama saati';
+      } else {
+        const med = medById(s.medId);
+        name = med ? med.name : '?';
+        meta = (s.dose||'') + (s.stomach ? ' • '+stomachIcon[s.stomach]+' '+stomachLabel[s.stomach] : '');
+      }
       return `<div class="check-item" onclick="markScheduleTaken('${s.id}')">
         <div class="check-box"></div>
         <div class="check-info">
-          <div class="check-name">${escapeHtml(med.name)}</div>
-          <div class="check-meta">${escapeHtml(s.dose||'')} ${s.stomach ? '• '+stomachIcon[s.stomach]+' '+stomachLabel[s.stomach] : ''}</div>
+          <div class="check-name">${escapeHtml(name)}</div>
+          <div class="check-meta">${escapeHtml(meta)}</div>
         </div>
         <div class="check-time">${s.time}</div>
       </div>`;
@@ -2288,10 +2330,18 @@ function renderMeds() {
       return;
     }
 
+    // Get meal entries today (to look up grams for done meals)
+    const todayMeals = STATE.data.mealEntries[today] || [];
+
     const pending = [], done = [];
     schedule.forEach(s => {
-      const med = medById(s.medId);
-      if (!med || !med.active) return;
+      let med = null;
+      if (s.type === 'meal') {
+        // Mama tipi — her zaman geçerli
+      } else {
+        med = medById(s.medId);
+        if (!med || !med.active) return;
+      }
       const taken = !!log[s.id];
       const item = { sched: s, med, taken, takenAt: taken ? log[s.id] : null };
       if (taken) done.push(item); else pending.push(item);
@@ -2299,32 +2349,55 @@ function renderMeds() {
     pending.sort((a,b) => a.sched.time.localeCompare(b.sched.time));
     done.sort((a,b) => b.takenAt - a.takenAt);
 
+    // Helper to get item display
+    const getItemDisplay = (it) => {
+      if (it.sched.type === 'meal') {
+        // For done meals, find actual grams from mealEntries
+        let grams = it.sched.expectedGrams || '';
+        if (it.taken) {
+          const entry = todayMeals.find(e => e.fromSchedule === it.sched.id);
+          if (entry) grams = entry.grams;
+        }
+        return {
+          name: '🍽️ Mama',
+          meta: it.taken && grams ? `${grams}g yedi` : (grams ? `Yaklaşık ${grams}g` : 'Mama saati')
+        };
+      }
+      return {
+        name: it.med ? it.med.name : '?',
+        meta: (it.sched.dose||'') + (it.sched.stomach ? ' • '+stomachIcon[it.sched.stomach]+' '+stomachLabel[it.sched.stomach] : '')
+      };
+    };
+
     let html = '';
     if (pending.length > 0) {
       html += `<div class="card"><div class="card-title"><span>Bekleyen (${pending.length})</span></div>`;
-      html += pending.map(r => `
-        <div class="check-item" onclick="markScheduleTaken('${r.sched.id}')">
+      html += pending.map(r => {
+        const d = getItemDisplay(r);
+        return `<div class="check-item" onclick="markScheduleTaken('${r.sched.id}')">
           <div class="check-box"></div>
           <div class="check-info">
-            <div class="check-name">${escapeHtml(r.med.name)}</div>
-            <div class="check-meta">${escapeHtml(r.sched.dose||'')} ${r.sched.stomach ? '• '+stomachIcon[r.sched.stomach]+' '+stomachLabel[r.sched.stomach] : ''}</div>
+            <div class="check-name">${escapeHtml(d.name)}</div>
+            <div class="check-meta">${escapeHtml(d.meta)}</div>
           </div>
           <div class="check-time">${r.sched.time}</div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       html += `</div>`;
     } else {
-      html += `<div class="card"><div class="empty-state"><div class="emoji">✅</div><div class="text">Bugün bekleyen ilaç yok</div></div></div>`;
+      html += `<div class="card"><div class="empty-state"><div class="emoji">✅</div><div class="text">Bugün bekleyen yok</div></div></div>`;
     }
     if (done.length > 0) {
       html += `<div class="card"><div class="card-title"><span>Verilenler (${done.length})</span></div>`;
       html += done.map(r => {
         const t = new Date(r.takenAt);
         const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+        const d = getItemDisplay(r);
         return `<div class="check-item done" onclick="unmarkScheduleTaken('${r.sched.id}')">
           <div class="check-box checked"></div>
           <div class="check-info">
-            <div class="check-name">${escapeHtml(r.med.name)}</div>
-            <div class="check-meta">${escapeHtml(r.sched.dose||'')} • ${tStr}'de verildi</div>
+            <div class="check-name">${escapeHtml(d.name)}</div>
+            <div class="check-meta">${escapeHtml(d.meta)} • ${tStr}'de</div>
           </div>
           <div class="check-time">${r.sched.time}</div>
         </div>`;
@@ -2337,26 +2410,30 @@ function renderMeds() {
 
   if (filter === 'schedule') {
     const schedule = [...(STATE.data.medSchedule || [])];
-    if (STATE.data.meds.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="emoji">💊</div><div class="text">Önce ilaç çeşitlerini ekle</div><button class="btn btn-primary" style="margin-top: 16px;" onclick="STATE.view.medFilter='list';renderMeds();document.querySelectorAll('#medSegment .segment-item').forEach((s,i)=>s.classList.toggle('active',i===2));">İlaç Çeşitleri ›</button></div>`;
-      return;
-    }
     schedule.sort((a,b) => a.time.localeCompare(b.time));
 
-    let html = `<button class="btn-add" onclick="openScheduleModal()">+ Takvime İlaç Ekle</button>`;
+    let html = `<button class="btn-add" onclick="openScheduleModal()">+ Takvime İlaç veya Mama Ekle</button>`;
 
     if (schedule.length === 0) {
-      html += `<div class="empty-state"><div class="emoji">📅</div><div class="text">Takvim boş</div><div style="font-size: 12px; color: var(--text-faint); margin-top: 8px;">Yukarıdaki + butonuna basarak<br>ilk takvim girişini ekle</div></div>`;
+      html += `<div class="empty-state"><div class="emoji">📅</div><div class="text">Takvim boş</div><div style="font-size: 12px; color: var(--text-faint); margin-top: 8px;">Yukarıdaki + butonuna basarak<br>ilk girişi ekle</div></div>`;
     } else {
-      html += `<div class="card"><div class="card-title"><span>Günlük Plan (${schedule.length} doz)</span></div>`;
+      html += `<div class="card"><div class="card-title"><span>Günlük Plan (${schedule.length} giriş)</span></div>`;
       html += schedule.map(s => {
-        const med = medById(s.medId);
-        if (!med) return '';
+        let name, meta;
+        if (s.type === 'meal') {
+          name = '🍽️ Mama';
+          meta = (s.expectedGrams ? `Yaklaşık ${s.expectedGrams}g` : 'Mama hatırlatması') + (s.notes?' • '+escapeHtml(s.notes):'');
+        } else {
+          const med = medById(s.medId);
+          if (!med) return '';
+          name = med.name;
+          meta = (s.dose||'') + (s.stomach ? ' • '+stomachIcon[s.stomach]+' '+stomachLabel[s.stomach] : '') + (s.notes?' • '+escapeHtml(s.notes):'');
+        }
         return `<div class="meal-row" style="cursor: pointer;" onclick="openScheduleModal('${s.id}')">
           <div class="meal-time">${s.time}</div>
           <div class="meal-info">
-            <div class="meal-name">${escapeHtml(med.name)}</div>
-            <div class="meal-desc">${escapeHtml(s.dose||'')} ${s.stomach ? '• '+stomachIcon[s.stomach]+' '+stomachLabel[s.stomach] : ''}${s.notes?' • '+escapeHtml(s.notes):''}</div>
+            <div class="meal-name">${escapeHtml(name)}</div>
+            <div class="meal-desc">${meta}</div>
           </div>
           <div style="color: var(--text-faint); font-size: 16px;">›</div>
         </div>`;
@@ -2376,24 +2453,34 @@ function renderMeds() {
     let html = '<div class="card">';
     dates.forEach(date => {
       const dayLog = STATE.data.medLogs[date] || {};
+      const dayMeals = STATE.data.mealEntries[date] || [];
       const items = [];
       Object.entries(dayLog).forEach(([scheduleId, takenAt]) => {
-        if (typeof takenAt !== 'number') return; // skip nested objects (legacy)
+        if (typeof takenAt !== 'number') return;
         const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
-        const med = sched ? medById(sched.medId) : null;
         const t = new Date(takenAt);
         const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-        items.push({
-          name: med ? med.name : '?',
-          dose: sched ? sched.dose : '',
-          scheduledTime: sched ? sched.time : '',
-          takenAt, takenStr: tStr
-        });
+        if (sched && sched.type === 'meal') {
+          // Find matching meal entry
+          const entry = dayMeals.find(e => e.fromSchedule === scheduleId);
+          items.push({
+            name: '🍽️ Mama',
+            dose: entry ? `${entry.grams}g` : 'verildi',
+            takenAt, takenStr: tStr
+          });
+        } else {
+          const med = sched ? medById(sched.medId) : null;
+          items.push({
+            name: med ? med.name : '?',
+            dose: sched ? sched.dose : '',
+            takenAt, takenStr: tStr
+          });
+        }
       });
       if (items.length === 0) return;
       items.sort((a,b) => a.takenAt - b.takenAt);
       html += `<div class="med-history-day">
-        <div class="med-history-date">${fmtDate(date)} <span style="color: var(--text-faint); font-size: 12px;">• ${items.length} doz</span></div>
+        <div class="med-history-date">${fmtDate(date)} <span style="color: var(--text-faint); font-size: 12px;">• ${items.length} kayıt</span></div>
         ${items.map(it => `
           <div class="med-history-item">
             <div class="med-history-time">${it.takenStr}</div>
@@ -2448,11 +2535,18 @@ function renderMeds() {
 function markScheduleTaken(scheduleId) {
   const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
   if (!sched) return;
+
+  // Mama tipi ise gram sor
+  if (sched.type === 'meal') {
+    openMealTakenModal(sched);
+    return;
+  }
+
+  // İlaç tipi (default)
   const med = STATE.data.meds.find(m => m.id === sched.medId);
   const today = todayKey();
   if (!STATE.data.medLogs[today]) STATE.data.medLogs[today] = {};
   STATE.data.medLogs[today][scheduleId] = Date.now();
-  // Decrement stock
   if (med && med.stock) {
     med.stock = Math.max(0, parseFloat(med.stock) - parseFloat(sched.perDose||1)).toString();
   }
@@ -2462,19 +2556,109 @@ function markScheduleTaken(scheduleId) {
   if (STATE.view.currentScreen === 'meds') renderMeds();
 }
 
+function openMealTakenModal(sched) {
+  const expectedGrams = sched.expectedGrams || '';
+  openModal(`<div class="modal-title">🍽️ Mama Verildi</div>
+    <div class="modal-subtitle">Saat ${sched.time} • Bihter ne kadar yedi?</div>
+    <div class="field">
+      <label class="field-label">Gerçek Miktar (gram)</label>
+      <input class="field-input" id="mealTakenGrams" type="number" step="1" inputmode="decimal" value="${expectedGrams}" placeholder="ör: 30" autofocus style="font-family: 'Fraunces', serif; font-size: 24px; text-align: center;">
+      ${expectedGrams ? `<div style="font-size: 11px; color: var(--text-faint); margin-top: 6px;">Tahmini: ${expectedGrams}g — gerçek miktarı yaz</div>` : ''}
+    </div>
+    <div class="gram-quick-btns" style="margin-top: 8px;">
+      <button class="gram-quick-btn" onclick="quickGramInModal(10)">10g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(20)">20g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(30)">30g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(50)">50g</button>
+      <button class="gram-quick-btn" onclick="quickGramInModal(70)">70g</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      <button class="btn btn-secondary" onclick="confirmNoMeal('${sched.id}')" style="color: var(--danger);">Yemedi</button>
+      <button class="btn btn-primary" onclick="confirmMealTaken('${sched.id}')">Kaydet</button>
+    </div>`);
+  // Auto-focus the input
+  setTimeout(() => {
+    const inp = document.getElementById('mealTakenGrams');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 100);
+}
+
+function quickGramInModal(g) {
+  const inp = document.getElementById('mealTakenGrams');
+  inp.value = (parseFloat(inp.value) || 0) + g;
+}
+
+function confirmMealTaken(scheduleId) {
+  const grams = parseFloat(document.getElementById('mealTakenGrams').value);
+  if (!grams || grams <= 0) { toast('Geçerli bir miktar gir', 'error'); return; }
+  const today = todayKey();
+
+  // 1. Schedule'ı tikle
+  if (!STATE.data.medLogs[today]) STATE.data.medLogs[today] = {};
+  STATE.data.medLogs[today][scheduleId] = Date.now();
+
+  // 2. Yemek günlüğüne ekle
+  if (!STATE.data.mealEntries[today]) STATE.data.mealEntries[today] = [];
+  STATE.data.mealEntries[today].push({
+    id: uid(),
+    time: Date.now(),
+    grams: grams,
+    fromSchedule: scheduleId  // takvimden geldiğini belirtmek için
+  });
+
+  queueSave();
+  closeModal();
+  toast(`✓ ${grams}g mama kaydedildi`, 'success');
+  renderHome();
+  if (STATE.view.currentScreen === 'meds') renderMeds();
+  if (STATE.view.currentScreen === 'meals') renderMeals();
+}
+
+function confirmNoMeal(scheduleId) {
+  if (!confirm('Bihter mama yemedi olarak işaretle?')) return;
+  const today = todayKey();
+  // Sadece schedule tikle, yemek girişi ekleme
+  if (!STATE.data.medLogs[today]) STATE.data.medLogs[today] = {};
+  STATE.data.medLogs[today][scheduleId] = Date.now();
+  // Mood tag'lere "yemedi" işareti ekleyelim mi? Daha sonra düşünülür.
+  // Şimdilik ruh hali notuna ekleyelim:
+  if (!STATE.data.moods[today]) STATE.data.moods[today] = { tags: [], note: '' };
+  const sched = STATE.data.medSchedule.find(s => s.id === scheduleId);
+  const timeStr = sched ? sched.time : '';
+  const newNote = `${timeStr} mamasını yemedi`;
+  STATE.data.moods[today].note = (STATE.data.moods[today].note ? STATE.data.moods[today].note + ' • ' : '') + newNote;
+
+  queueSave();
+  closeModal();
+  toast('🔴 Yemedi olarak kaydedildi');
+  renderHome();
+  if (STATE.view.currentScreen === 'meds') renderMeds();
+}
+
 function unmarkScheduleTaken(scheduleId) {
-  if (!confirm('Bu ilacın verildiği işaretini kaldır?')) return;
+  if (!confirm('Verildi işaretini kaldır?')) return;
   const today = todayKey();
   const sched = (STATE.data.medSchedule || []).find(s => s.id === scheduleId);
   if (STATE.data.medLogs[today] && STATE.data.medLogs[today][scheduleId]) {
     delete STATE.data.medLogs[today][scheduleId];
     if (sched) {
-      const med = STATE.data.meds.find(m => m.id === sched.medId);
-      if (med && med.stock) med.stock = (parseFloat(med.stock) + parseFloat(sched.perDose||1)).toString();
+      if (sched.type === 'meal') {
+        // Yemek girişini de sil
+        if (STATE.data.mealEntries[today]) {
+          STATE.data.mealEntries[today] = STATE.data.mealEntries[today].filter(e => e.fromSchedule !== scheduleId);
+          if (STATE.data.mealEntries[today].length === 0) delete STATE.data.mealEntries[today];
+        }
+      } else {
+        // İlaç için stok geri yükle
+        const med = STATE.data.meds.find(m => m.id === sched.medId);
+        if (med && med.stock) med.stock = (parseFloat(med.stock) + parseFloat(sched.perDose||1)).toString();
+      }
     }
   }
   queueSave(); renderHome();
   if (STATE.view.currentScreen === 'meds') renderMeds();
+  if (STATE.view.currentScreen === 'meals') renderMeals();
 }
 document.querySelectorAll('#medSegment .segment-item').forEach(seg => {
   seg.addEventListener('click', () => {
@@ -3095,36 +3279,53 @@ function openScheduleModal(scheduleId) {
   const s = scheduleId ? (STATE.data.medSchedule || []).find(x => x.id === scheduleId) : null;
   const activeMeds = STATE.data.meds.filter(m => m.active);
 
-  if (activeMeds.length === 0 && !s) {
-    toast('Önce ilaç çeşidi ekle', 'error');
-    return;
-  }
+  // Default type: meal if no meds yet, else med
+  const defaultType = activeMeds.length > 0 ? 'med' : 'meal';
+  const sched = s || { id: '', type: defaultType, medId: activeMeds[0]?.id || '', time: '08:00', dose: '', perDose: '1', stomach: '', notes: '', expectedGrams: '' };
+  const currentType = sched.type || 'med';
 
-  const sched = s || { id: '', medId: activeMeds[0]?.id || '', time: '08:00', dose: '', perDose: '1', stomach: '', notes: '' };
+  openModal(`<div class="modal-title">${s ? 'Takvim Girişini Düzenle' : 'Takvime Ekle'}</div>
+    <div class="modal-subtitle">İlaç veya mama hatırlatması</div>
 
-  openModal(`<div class="modal-title">${s ? 'Takvim Girişini Düzenle' : 'Takvime İlaç Ekle'}</div>
-    <div class="modal-subtitle">Hangi ilaç, hangi saatte, ne kadar?</div>
     <div class="field">
-      <label class="field-label">İlaç *</label>
-      <select class="field-input" id="sMedId">
-        ${activeMeds.map(m => `<option value="${m.id}" ${sched.medId===m.id?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}
-      </select>
+      <label class="field-label">Tip</label>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="type-btn ${currentType==='med'?'active':''}" data-type="med" onclick="switchScheduleType('med')">💊 İlaç</button>
+        <button type="button" class="type-btn ${currentType==='meal'?'active':''}" data-type="meal" onclick="switchScheduleType('meal')">🍽️ Mama</button>
+      </div>
     </div>
-    <div class="field-row">
-      <div class="field"><label class="field-label">Saat *</label><input class="field-input" id="sTime" type="time" value="${escapeHtml(sched.time)}"></div>
-      <div class="field"><label class="field-label">Aç / Tok</label>
+
+    <div id="schedMedFields" style="${currentType==='med'?'':'display:none;'}">
+      <div class="field">
+        <label class="field-label">İlaç *</label>
+        <select class="field-input" id="sMedId">
+          ${activeMeds.length === 0 ? '<option value="">— önce ilaç ekle —</option>' : activeMeds.map(m => `<option value="${m.id}" ${sched.medId===m.id?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label class="field-label">Doz Açıklaması</label><input class="field-input" id="sDose" value="${escapeHtml(sched.dose||'')}" placeholder="ör: 1/4 tablet"></div>
+        <div class="field"><label class="field-label">Adet</label><input class="field-input" id="sPerDose" type="number" step="0.01" value="${escapeHtml(sched.perDose||'1')}" placeholder="1"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Aç / Tok</label>
         <select class="field-input" id="sStomach">
           <option value="" ${!sched.stomach?'selected':''}>Fark etmez</option>
-          <option value="empty" ${sched.stomach==='empty'?'selected':''}>🍃 Aç</option>
-          <option value="full" ${sched.stomach==='full'?'selected':''}>🍽️ Tok</option>
+          <option value="empty" ${sched.stomach==='empty'?'selected':''}>🍃 Aç karnına</option>
+          <option value="full" ${sched.stomach==='full'?'selected':''}>🍽️ Tok karnına</option>
         </select>
       </div>
     </div>
-    <div class="field-row">
-      <div class="field"><label class="field-label">Doz Açıklaması</label><input class="field-input" id="sDose" value="${escapeHtml(sched.dose)}" placeholder="ör: 1/4 tablet, 0.2 ml"></div>
-      <div class="field"><label class="field-label">Adet</label><input class="field-input" id="sPerDose" type="number" step="0.01" value="${escapeHtml(sched.perDose)}" placeholder="1"></div>
+
+    <div id="schedMealFields" style="${currentType==='meal'?'':'display:none;'}">
+      <div class="field">
+        <label class="field-label">Tahmini Mama Miktarı (g)</label>
+        <input class="field-input" id="sExpectedGrams" type="number" step="1" value="${escapeHtml(sched.expectedGrams||'')}" placeholder="ör: 30">
+        <div style="font-size: 11px; color: var(--text-faint); margin-top: 6px;">Gerçek miktarı verirken sorulacak. Buradaki sadece hatırlatma için.</div>
+      </div>
     </div>
-    <div class="field"><label class="field-label">Bu saate özel not</label><textarea class="field-input" id="sNotes" placeholder="ör: Yarım saat sonra mama">${escapeHtml(sched.notes)}</textarea></div>
+
+    <div class="field"><label class="field-label">Saat *</label><input class="field-input" id="sTime" type="time" value="${escapeHtml(sched.time)}"></div>
+    <div class="field"><label class="field-label">Not</label><textarea class="field-input" id="sNotes" placeholder="ör: Isıt, su ekle">${escapeHtml(sched.notes||'')}</textarea></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
       ${s ? `<button class="btn btn-secondary" onclick="deleteSchedule('${s.id}')" style="color: var(--danger);">Sil</button>` : ''}
@@ -3132,19 +3333,42 @@ function openScheduleModal(scheduleId) {
     </div>`);
 }
 
+function switchScheduleType(type) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  document.getElementById('schedMedFields').style.display = type === 'med' ? '' : 'none';
+  document.getElementById('schedMealFields').style.display = type === 'meal' ? '' : 'none';
+}
+
 function saveSchedule(id) {
-  const medId = document.getElementById('sMedId').value;
+  const activeBtn = document.querySelector('.type-btn.active');
+  const type = activeBtn ? activeBtn.dataset.type : 'med';
   const time = document.getElementById('sTime').value;
-  if (!medId || !time) { toast('İlaç ve saat gerekli', 'error'); return; }
-  const data = {
-    id: id || uid(),
-    medId,
-    time,
-    dose: document.getElementById('sDose').value.trim(),
-    perDose: document.getElementById('sPerDose').value || '1',
-    stomach: document.getElementById('sStomach').value,
-    notes: document.getElementById('sNotes').value.trim()
-  };
+  if (!time) { toast('Saat gerekli', 'error'); return; }
+
+  let data;
+  if (type === 'med') {
+    const medId = document.getElementById('sMedId').value;
+    if (!medId) { toast('İlaç seç', 'error'); return; }
+    data = {
+      id: id || uid(),
+      type: 'med',
+      medId,
+      time,
+      dose: document.getElementById('sDose').value.trim(),
+      perDose: document.getElementById('sPerDose').value || '1',
+      stomach: document.getElementById('sStomach').value,
+      notes: document.getElementById('sNotes').value.trim()
+    };
+  } else {
+    data = {
+      id: id || uid(),
+      type: 'meal',
+      time,
+      expectedGrams: document.getElementById('sExpectedGrams').value || '',
+      notes: document.getElementById('sNotes').value.trim()
+    };
+  }
+
   if (!STATE.data.medSchedule) STATE.data.medSchedule = [];
   if (id) {
     const idx = STATE.data.medSchedule.findIndex(s => s.id === id);
@@ -3153,7 +3377,7 @@ function saveSchedule(id) {
     STATE.data.medSchedule.push(data);
   }
   queueSave(); scheduleNotifications(); closeModal(); renderAll();
-  toast(id ? 'Takvim girişi güncellendi' : 'Takvime eklendi', 'success');
+  toast(id ? 'Takvim güncellendi' : (type === 'meal' ? 'Mama eklendi' : 'Takvime eklendi'), 'success');
 }
 
 function deleteSchedule(id) {
@@ -3513,8 +3737,16 @@ function scheduleNotifications() {
   const now = new Date();
   const schedule = STATE.data.medSchedule || [];
   schedule.forEach(s => {
-    const med = STATE.data.meds.find(m => m.id === s.medId);
-    if (!med || !med.active) return;
+    let title, bodyExtra = '';
+    if (s.type === 'meal') {
+      title = '🍽️ Mama Saati';
+      bodyExtra = s.expectedGrams ? ` • Yaklaşık ${s.expectedGrams}g` : '';
+    } else {
+      const med = STATE.data.meds.find(m => m.id === s.medId);
+      if (!med || !med.active) return;
+      title = '💊 ' + med.name;
+      bodyExtra = (s.dose ? ' • ' + s.dose : '') + (s.stomach === 'empty' ? ' • 🍃 Aç karnına' : s.stomach === 'full' ? ' • 🍽️ Tok karnına' : '');
+    }
     [0, 1].forEach(dayOffset => {
       const [h, mi] = s.time.split(':').map(Number);
       const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, mi, 0, 0);
@@ -3524,8 +3756,7 @@ function scheduleNotifications() {
           const dayKey = todayKey(d);
           const log = STATE.data.medLogs[dayKey] || {};
           if (!log[s.id]) {
-            const stomachLabel = s.stomach === 'empty' ? ' • 🍃 Aç karnına' : s.stomach === 'full' ? ' • 🍽️ Tok karnına' : '';
-            new Notification('💊 ' + med.name, { body: `${s.time} • ${s.dose||''}${stomachLabel}`, icon: 'icon-192.png', tag: 'sched-' + s.id + '-' + dayKey, requireInteraction: true });
+            new Notification(title, { body: `${s.time}${bodyExtra}`, icon: 'icon-192.png', tag: 'sched-' + s.id + '-' + dayKey, requireInteraction: s.type !== 'meal' });
           }
         }, delta);
         STATE.notificationTimers.push(tid);
