@@ -355,6 +355,23 @@ input, textarea, select {
   justify-content: center;
 }
 
+.profile-motto {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--accent-soft);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  padding: 4px 14px;
+  background: var(--accent-dim);
+  border-radius: 100px;
+  border: 1px solid rgba(255, 140, 66, 0.2);
+}
+
 .tag {
   background: var(--accent-dim);
   color: var(--accent-soft);
@@ -1035,7 +1052,7 @@ textarea.field-input {
   position: fixed;
   top: calc(20px + var(--safe-top));
   left: 50%;
-  transform: translateX(-50%) translateY(-120%);
+  transform: translateX(-50%) translateY(-200%);
   background: var(--bg-elev-2);
   border: 1px solid var(--border-strong);
   padding: 12px 18px;
@@ -1043,16 +1060,19 @@ textarea.field-input {
   font-size: 13px;
   font-weight: 500;
   z-index: 2000;
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
   white-space: nowrap;
   box-shadow: var(--shadow-lg);
   display: flex;
   align-items: center;
   gap: 8px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .toast.show {
   transform: translateX(-50%) translateY(0);
+  opacity: 1;
 }
 
 .toast.success { border-color: var(--success); }
@@ -1586,7 +1606,7 @@ input[type="file"] { display: none; }
       </label>
       <div class="profile-name" id="profileName">Bihter</div>
       <div class="profile-age" id="profileAge">—</div>
-      <div class="profile-tags" id="profileTags"></div>
+      <div class="profile-motto" id="profileMotto"></div>
     </div>
 
     <!-- Vet Emergency -->
@@ -1845,6 +1865,7 @@ const STATE = {
   data: {
     profile: { name: "Bihter", species: "cat", birthDate: "2023-06-20", photo: null,
       conditions: ["HCM", "Böbrek", "Karaciğer"],
+      motto: "Evimizin prensesi 🌸",
       vetName: "", vetPhone: "", vetAddress: "", notificationsEnabled: false },
     meds: [], medSchedule: [], medLogs: {}, foods: [], mealLogs: {}, mealEntries: {},
     foodInfo: { brand: "", type: "", notes: "" },
@@ -2103,7 +2124,7 @@ function renderHome() {
   } else {
     fallback.style.display = ''; fallback.textContent = p.species === 'cat' ? '🐱' : '🐶';
   }
-  document.getElementById('profileTags').innerHTML = (p.conditions||[]).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('');
+  document.getElementById('profileMotto').textContent = p.motto || 'Evimizin prensesi 🌸';
   document.getElementById('vetName').textContent = p.vetName || 'Veteriner ekle';
   document.getElementById('vetPhone').textContent = p.vetPhone || 'Ayarlardan tanımla';
 
@@ -3671,6 +3692,7 @@ function openSettings() {
     <div class="field"><label class="field-label">Doğum Tarihi</label><input class="field-input" id="sBirth" type="date" value="${p.birthDate}"></div>
     <div class="field"><label class="field-label">Tür</label>
       <select class="field-input" id="sSpecies"><option value="cat" ${p.species==='cat'?'selected':''}>🐱 Kedi</option><option value="dog" ${p.species==='dog'?'selected':''}>🐶 Köpek</option></select></div>
+    <div class="field"><label class="field-label">Sevgi Mesajı</label><input class="field-input" id="sMotto" value="${escapeHtml(p.motto||'')}" placeholder="ör: Evimizin prensesi 🌸"><div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Ana ekranda fotoğrafın altında gözükür</div></div>
     <div class="card-title" style="margin-top: 16px;">Veteriner</div>
     <div class="field"><label class="field-label">Veteriner Adı</label><input class="field-input" id="sVetName" value="${escapeHtml(p.vetName)}" placeholder="ör: Dr. Ahmet"></div>
     <div class="field"><label class="field-label">Telefon</label><input class="field-input" id="sVetPhone" value="${escapeHtml(p.vetPhone)}" placeholder="ör: 0532..." type="tel"></div>
@@ -3691,6 +3713,7 @@ function saveSettings() {
   STATE.data.profile.name = document.getElementById('sName').value.trim() || 'Bihter';
   STATE.data.profile.birthDate = document.getElementById('sBirth').value;
   STATE.data.profile.species = document.getElementById('sSpecies').value;
+  STATE.data.profile.motto = document.getElementById('sMotto').value.trim();
   STATE.data.profile.vetName = document.getElementById('sVetName').value.trim();
   STATE.data.profile.vetPhone = document.getElementById('sVetPhone').value.trim();
   STATE.data.profile.vetAddress = document.getElementById('sVetAddr').value.trim();
