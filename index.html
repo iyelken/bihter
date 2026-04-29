@@ -1754,6 +1754,73 @@ textarea.field-input {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* ===== VETERİNER LİSTESİ ===== */
+.vet-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.vet-list-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.vet-list-info { flex: 1; min-width: 0; cursor: pointer; }
+.vet-list-name {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+.vet-list-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.vet-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.vet-pick-item:active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.vet-pick-icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.vet-pick-info { flex: 1; min-width: 0; }
+.vet-pick-name {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.vet-pick-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
 .journal-auto { opacity: 0.55; }
 .journal-auto .journal-icon { background: transparent; border-color: var(--border); }
 .journal-important { background: linear-gradient(90deg, rgba(245,179,66,0.08), transparent); margin: 0 -10px; padding: 10px; border-radius: 8px; }
@@ -2157,7 +2224,7 @@ const STATE = {
     profile: { name: "Bihter", species: "cat", birthDate: "2023-06-20", photo: null,
       conditions: ["HCM", "Böbrek", "Karaciğer"],
       motto: "Evimizin prensesi 🌸",
-      vetName: "", vetPhone: "", vetAddress: "", notificationsEnabled: false },
+      vetName: "", vetPhone: "", vetAddress: "", vets: [], notificationsEnabled: false },
     meds: [], medSchedule: [], medLogs: {}, foods: [], mealLogs: {}, mealEntries: {},
     foodInfo: { brand: "", type: "", notes: "" },
     waterLogs: {}, weights: [], tests: [], vaccines: [], events: [], history: [], moods: {},
@@ -2356,11 +2423,35 @@ function migrateMedsToSchedule() {
   }
 }
 
+function migrateVetsToArray() {
+  // Eski tek vet alanını → yeni vets array'e
+  const p = STATE.data.profile;
+  if (!p.vets) p.vets = [];
+  if (p.vetName && p.vets.length === 0) {
+    p.vets.push({
+      id: uid(),
+      name: p.vetName,
+      role: 'Ana Doktor',
+      phone: p.vetPhone || '',
+      address: p.vetAddress || '',
+      notes: '',
+      primary: true
+    });
+    queueSave();
+  }
+  // Eğer hiç primary yoksa ilkini primary yap
+  if (p.vets.length > 0 && !p.vets.some(v => v.primary)) {
+    p.vets[0].primary = true;
+    queueSave();
+  }
+}
+
 function enterApp() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('cloudIdLabel').textContent = STATE.cloudId;
   migrateMedsToSchedule();
+  migrateVetsToArray();
   startCloudListener();
   renderAll();
   scheduleNotifications();
@@ -2417,8 +2508,10 @@ function renderHome() {
     fallback.style.display = ''; fallback.textContent = p.species === 'cat' ? '🐱' : '🐶';
   }
   document.getElementById('profileMotto').textContent = p.motto || 'Evimizin prensesi 🌸';
-  document.getElementById('vetName').textContent = p.vetName || 'Veteriner ekle';
-  document.getElementById('vetPhone').textContent = p.vetPhone || 'Ayarlardan tanımla';
+  // Birincil veteriner ana kartta gözükür
+  const primaryVet = (p.vets || []).find(v => v.primary) || (p.vets || [])[0];
+  document.getElementById('vetName').textContent = primaryVet ? primaryVet.name : 'Veteriner ekle';
+  document.getElementById('vetPhone').textContent = primaryVet ? (primaryVet.phone || primaryVet.role || '—') : 'Ayarlardan tanımla';
 
   const today = todayKey();
   const todayMedLog = STATE.data.medLogs[today] || {};
@@ -3711,10 +3804,43 @@ function resetWater() {
   if (STATE.view.currentScreen === 'meals') renderMeals();
 }
 function callVet(e) {
-  e.preventDefault();
-  const phone = STATE.data.profile.vetPhone;
-  if (!phone) { openSettings(); return; }
-  window.location.href = 'tel:' + phone.replace(/\s/g,'');
+  if (e) e.preventDefault();
+  const vets = STATE.data.profile.vets || [];
+  if (vets.length === 0) { openSettings(); return; }
+  if (vets.length === 1) {
+    const v = vets[0];
+    if (!v.phone) { toast('Telefon tanımlanmamış'); openVetModal(v.id); return; }
+    window.location.href = 'tel:' + v.phone.replace(/\s/g,'');
+    return;
+  }
+  // Birden fazla vet varsa seçici aç
+  openVetCallPicker();
+}
+
+function openVetCallPicker() {
+  const vets = STATE.data.profile.vets || [];
+  const sorted = [...vets].sort((a,b) => (b.primary?1:0) - (a.primary?1:0));
+  let html = `<div class="modal-title">📞 Hangi Veteriner?</div>
+    <div class="modal-subtitle">Aramak istediğin doktoru seç</div>`;
+  html += sorted.map(v => `
+    <div class="vet-pick-item" onclick="dialVet('${v.id}')">
+      <div class="vet-pick-icon">${v.primary ? '⭐' : '🏥'}</div>
+      <div class="vet-pick-info">
+        <div class="vet-pick-name">${escapeHtml(v.name)}${v.primary ? ' <span style="font-size: 10px; color: var(--accent);">BİRİNCİL</span>' : ''}</div>
+        <div class="vet-pick-meta">${escapeHtml(v.role || 'Veteriner')}${v.phone ? ' • '+escapeHtml(v.phone) : ' • Telefon yok'}</div>
+      </div>
+      <div style="color: var(--text-faint); font-size: 18px;">›</div>
+    </div>`).join('');
+  html += `<div class="modal-actions"><button class="btn btn-secondary btn-block" onclick="closeModal()">İptal</button></div>`;
+  openModal(html);
+}
+
+function dialVet(id) {
+  const v = (STATE.data.profile.vets || []).find(x => x.id === id);
+  if (!v) return;
+  if (!v.phone) { toast('Telefon tanımlanmamış', 'error'); return; }
+  closeModal();
+  window.location.href = 'tel:' + v.phone.replace(/\s/g,'');
 }
 // Eski moodTags ve dailyNote event listener'ları — artık Günlük sekmesinde
 // (renderJournalMoodSection içinde dinamik olarak ekleniyorlar)
@@ -4220,10 +4346,9 @@ function openSettings() {
     <div class="field"><label class="field-label">Tür</label>
       <select class="field-input" id="sSpecies"><option value="cat" ${p.species==='cat'?'selected':''}>🐱 Kedi</option><option value="dog" ${p.species==='dog'?'selected':''}>🐶 Köpek</option></select></div>
     <div class="field"><label class="field-label">Sevgi Mesajı</label><input class="field-input" id="sMotto" value="${escapeHtml(p.motto||'')}" placeholder="ör: Evimizin prensesi 🌸"><div style="font-size: 11px; color: var(--text-faint); margin-top: 4px;">Ana ekranda fotoğrafın altında gözükür</div></div>
-    <div class="card-title" style="margin-top: 16px;">Veteriner</div>
-    <div class="field"><label class="field-label">Veteriner Adı</label><input class="field-input" id="sVetName" value="${escapeHtml(p.vetName)}" placeholder="ör: Dr. Ahmet"></div>
-    <div class="field"><label class="field-label">Telefon</label><input class="field-input" id="sVetPhone" value="${escapeHtml(p.vetPhone)}" placeholder="ör: 0532..." type="tel"></div>
-    <div class="field"><label class="field-label">Adres</label><textarea class="field-input" id="sVetAddr" placeholder="Klinik adresi">${escapeHtml(p.vetAddress)}</textarea></div>
+    <div class="card-title" style="margin-top: 16px;">Veterinerler</div>
+    <div id="vetListContainer">${renderVetListInSettings()}</div>
+    <button class="btn btn-secondary btn-block" style="margin-top: 8px;" onclick="openVetModal()">+ Veteriner Ekle</button>
     <div class="card-title" style="margin-top: 16px;">Bildirimler</div>
     <div class="setting-item" onclick="requestNotificationPermission()">
       <div class="setting-icon">🔔</div>
@@ -4241,11 +4366,139 @@ function saveSettings() {
   STATE.data.profile.birthDate = document.getElementById('sBirth').value;
   STATE.data.profile.species = document.getElementById('sSpecies').value;
   STATE.data.profile.motto = document.getElementById('sMotto').value.trim();
-  STATE.data.profile.vetName = document.getElementById('sVetName').value.trim();
-  STATE.data.profile.vetPhone = document.getElementById('sVetPhone').value.trim();
-  STATE.data.profile.vetAddress = document.getElementById('sVetAddr').value.trim();
   queueSave(); closeModal(); renderAll(); toast('Ayarlar kaydedildi', 'success');
 }
+// ============================================================
+// VETERİNERLER (multiple vets)
+// ============================================================
+const VET_ROLES = ['Ana Doktor', 'Kardiyolog', 'Acil Servis', 'Dermatolog', 'Cerrah', 'Diş Hekimi', 'Diğer'];
+
+function renderVetListInSettings() {
+  const vets = STATE.data.profile.vets || [];
+  if (vets.length === 0) {
+    return `<div class="empty-state" style="padding: 16px;"><div class="emoji">🏥</div><div class="text" style="font-size: 13px;">Henüz veteriner eklenmedi</div></div>`;
+  }
+  const sorted = [...vets].sort((a,b) => (b.primary?1:0) - (a.primary?1:0));
+  return sorted.map(v => `
+    <div class="vet-list-item">
+      <div class="vet-list-icon">${v.primary ? '⭐' : '🏥'}</div>
+      <div class="vet-list-info" onclick="openVetModal('${v.id}')">
+        <div class="vet-list-name">${escapeHtml(v.name)}${v.primary ? ' <span style="font-size: 9px; letter-spacing: 0.1em; color: var(--accent); margin-left: 4px;">BİRİNCİL</span>' : ''}</div>
+        <div class="vet-list-meta">${escapeHtml(v.role || 'Veteriner')}${v.phone ? ' • '+escapeHtml(v.phone) : ''}</div>
+      </div>
+      <button class="med-action" onclick="openVetModal('${v.id}')" title="Düzenle">✎</button>
+    </div>`).join('');
+}
+
+function openVetModal(id) {
+  const v = id ? (STATE.data.profile.vets || []).find(x => x.id === id) : null;
+  const vet = v || { id: '', name: '', role: 'Ana Doktor', phone: '', address: '', notes: '', primary: false };
+  const isEmpty = (STATE.data.profile.vets || []).length === 0;
+
+  openModal(`<div class="modal-title">${v ? 'Veterineri Düzenle' : 'Yeni Veteriner'}</div>
+    <div class="modal-subtitle">${v ? escapeHtml(v.name) : 'Yeni doktor bilgisi'}</div>
+
+    <div class="field"><label class="field-label">Doktor / Klinik Adı *</label>
+      <input class="field-input" id="vName" value="${escapeHtml(vet.name)}" placeholder="ör: Dr. Ahmet Yılmaz" autofocus></div>
+
+    <div class="field"><label class="field-label">Görev / Uzmanlık</label>
+      <select class="field-input" id="vRolePreset">
+        ${VET_ROLES.map(r => `<option value="${r}" ${vet.role===r?'selected':''}>${r}</option>`).join('')}
+      </select>
+      <input class="field-input" id="vRoleCustom" value="${VET_ROLES.includes(vet.role)?'':escapeHtml(vet.role||'')}" placeholder="Özel: ör. Mama Uzmanı" style="margin-top: 6px; ${VET_ROLES.includes(vet.role) && vet.role !== 'Diğer' ? 'display:none;' : ''}">
+    </div>
+
+    <div class="field"><label class="field-label">Telefon</label>
+      <input class="field-input" id="vPhone" type="tel" value="${escapeHtml(vet.phone||'')}" placeholder="ör: 0532 123 45 67"></div>
+
+    <div class="field"><label class="field-label">Adres</label>
+      <textarea class="field-input" id="vAddress" placeholder="Klinik adresi">${escapeHtml(vet.address||'')}</textarea></div>
+
+    <div class="field"><label class="field-label">Notlar</label>
+      <textarea class="field-input" id="vNotes" placeholder="ör: Salı/Perşembe poliklinik">${escapeHtml(vet.notes||'')}</textarea></div>
+
+    <div class="field" style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--bg-elev); border-radius: 10px;">
+      <input type="checkbox" id="vPrimary" ${vet.primary || isEmpty ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--accent);">
+      <label for="vPrimary" style="font-size: 13px; cursor: pointer; flex: 1;">⭐ Birincil veteriner (ana ekranda gösterilir)</label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      ${v ? `<button class="btn btn-secondary" onclick="deleteVet('${v.id}')" style="color: var(--danger);">Sil</button>` : ''}
+      <button class="btn btn-primary" onclick="saveVet('${v ? v.id : ''}')">Kaydet</button>
+    </div>`);
+
+  // Role select handler — show custom input when "Diğer"
+  setTimeout(() => {
+    const sel = document.getElementById('vRolePreset');
+    const cust = document.getElementById('vRoleCustom');
+    if (sel && cust) {
+      sel.addEventListener('change', () => {
+        cust.style.display = sel.value === 'Diğer' ? '' : 'none';
+        if (sel.value !== 'Diğer') cust.value = '';
+      });
+    }
+  }, 50);
+}
+
+function saveVet(id) {
+  const name = document.getElementById('vName').value.trim();
+  if (!name) { toast('Veteriner adı gerekli', 'error'); return; }
+
+  const rolePreset = document.getElementById('vRolePreset').value;
+  const roleCustom = document.getElementById('vRoleCustom').value.trim();
+  const role = rolePreset === 'Diğer' ? (roleCustom || 'Diğer') : rolePreset;
+  const isPrimary = document.getElementById('vPrimary').checked;
+
+  if (!STATE.data.profile.vets) STATE.data.profile.vets = [];
+
+  const data = {
+    id: id || uid(),
+    name,
+    role,
+    phone: document.getElementById('vPhone').value.trim(),
+    address: document.getElementById('vAddress').value.trim(),
+    notes: document.getElementById('vNotes').value.trim(),
+    primary: isPrimary
+  };
+
+  // Eğer bu birincil yapılıyorsa diğerlerinin primary'sini kapat
+  if (isPrimary) {
+    STATE.data.profile.vets.forEach(v => v.primary = false);
+  }
+
+  if (id) {
+    const idx = STATE.data.profile.vets.findIndex(v => v.id === id);
+    STATE.data.profile.vets[idx] = data;
+  } else {
+    STATE.data.profile.vets.push(data);
+  }
+
+  // En az bir primary olsun
+  if (!STATE.data.profile.vets.some(v => v.primary)) {
+    STATE.data.profile.vets[0].primary = true;
+  }
+
+  queueSave(); closeModal(); renderAll();
+  // Ayarlar açıksa listeyi güncelle
+  const cont = document.getElementById('vetListContainer');
+  if (cont) cont.innerHTML = renderVetListInSettings();
+  toast(id ? 'Veteriner güncellendi' : 'Veteriner eklendi', 'success');
+  // Ayarlar modalını yeniden aç
+  setTimeout(() => openSettings(), 100);
+}
+
+function deleteVet(id) {
+  if (!confirm('Bu veterineri sil?')) return;
+  STATE.data.profile.vets = (STATE.data.profile.vets || []).filter(v => v.id !== id);
+  // En az bir primary garanti
+  if (STATE.data.profile.vets.length > 0 && !STATE.data.profile.vets.some(v => v.primary)) {
+    STATE.data.profile.vets[0].primary = true;
+  }
+  queueSave(); closeModal(); renderAll(); toast('Veteriner silindi');
+  setTimeout(() => openSettings(), 100);
+}
+
 function exportData() {
   const json = JSON.stringify(STATE.data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
