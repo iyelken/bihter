@@ -1,0 +1,2833 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f0e0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bihter">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Bihter • Sağlık Takip</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #0f0e0c;
+  --bg-elev: #1a1815;
+  --bg-elev-2: #252118;
+  --bg-card: #1f1c17;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #f5f1ea;
+  --text-dim: #a8a196;
+  --text-faint: #6b6357;
+  --accent: #ff8c42;
+  --accent-soft: #ffa66e;
+  --accent-dim: rgba(255, 140, 66, 0.15);
+  --accent-glow: rgba(255, 140, 66, 0.35);
+  --success: #7cc97c;
+  --warning: #f5b342;
+  --danger: #e07a5f;
+  --info: #8eb5d9;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 24px;
+  --safe-bottom: env(safe-area-inset-bottom, 0);
+  --safe-top: env(safe-area-inset-top, 0);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: fixed;
+  width: 100%;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 140, 66, 0.08), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(255, 140, 66, 0.04), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  border: none;
+  outline: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ===== APP STRUCTURE ===== */
+#app {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: calc(var(--safe-top) + 12px) 20px calc(90px + var(--safe-bottom)) 20px;
+  -webkit-overflow-scrolling: touch;
+  display: none;
+}
+
+.screen.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 14, 12, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+  padding: 8px 12px calc(8px + var(--safe-bottom)) 12px;
+  display: flex;
+  justify-content: space-around;
+  z-index: 100;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.nav-item.active {
+  color: var(--accent);
+}
+
+.nav-item .icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.nav-item .label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 0 2px 2px;
+}
+
+/* ===== HEADER ===== */
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-top: 4px;
+}
+
+.screen-title {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.screen-title em {
+  font-style: italic;
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  font-size: 18px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  background: var(--bg-elev-2);
+}
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title .action {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+/* ===== HOME: PROFILE ===== */
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 20px 28px;
+  background: linear-gradient(180deg, rgba(255, 140, 66, 0.08), transparent);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-hero::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+  filter: blur(20px);
+  opacity: 0.5;
+}
+
+.profile-photo {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--bg-elev-2);
+  border: 3px solid var(--accent);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(255, 140, 66, 0.3);
+}
+
+.profile-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-photo .upload-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 10px;
+  padding: 4px;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.profile-photo:hover .upload-hint,
+.profile-photo:active .upload-hint {
+  opacity: 1;
+}
+
+.profile-name {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.profile-age {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.profile-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tag {
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  border: 1px solid rgba(255, 140, 66, 0.2);
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ===== EMERGENCY VET BUTTON ===== */
+.vet-call {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(224, 122, 95, 0.15), rgba(224, 122, 95, 0.05));
+  border: 1px solid rgba(224, 122, 95, 0.3);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s;
+}
+
+.vet-call:active { transform: scale(0.98); }
+
+.vet-call .vet-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.vet-call .vet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vet-call .vet-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--danger);
+  margin-bottom: 2px;
+}
+
+.vet-call .vet-name {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vet-call .vet-phone {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ===== TODAY GRID ===== */
+.today-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card .stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.stat-card .stat-value {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.stat-card .stat-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.stat-card .stat-emoji {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+/* ===== CHECKLIST ITEMS ===== */
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.check-item:last-child { border-bottom: none; }
+
+.check-box {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.check-box.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.check-box.checked::after {
+  content: '✓';
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.check-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.check-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.check-time {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.check-item.done .check-name {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+/* ===== MEAL SCALE ===== */
+.meal-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.meal-row:last-child { border-bottom: none; }
+
+.meal-time {
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.meal-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.meal-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.meal-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.meal-scale {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.scale-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.15s;
+  background: var(--bg-elev);
+}
+
+.scale-btn[data-val="full"].active { background: rgba(124, 201, 124, 0.2); border-color: var(--success); }
+.scale-btn[data-val="half"].active { background: rgba(245, 179, 66, 0.2); border-color: var(--warning); }
+.scale-btn[data-val="none"].active { background: rgba(224, 122, 95, 0.2); border-color: var(--danger); }
+
+/* ===== MOOD TAGS ===== */
+.mood-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mood-tag {
+  padding: 8px 14px;
+  border-radius: 100px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mood-tag.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-soft);
+}
+
+textarea.note-input {
+  width: 100%;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  color: var(--text);
+  resize: none;
+  min-height: 80px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+textarea.note-input:focus { border-color: var(--accent); }
+
+/* ===== UPCOMING ALERTS ===== */
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.alert-item:last-child { border-bottom: none; }
+
+.alert-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.alert-icon.warning { background: rgba(245, 179, 66, 0.15); color: var(--warning); }
+.alert-icon.info { background: rgba(142, 181, 217, 0.15); color: var(--info); }
+.alert-icon.danger { background: rgba(224, 122, 95, 0.15); color: var(--danger); }
+
+.alert-info { flex: 1; min-width: 0; }
+.alert-title { font-weight: 600; font-size: 14px; }
+.alert-meta { font-size: 12px; color: var(--text-dim); }
+
+/* ===== EMPTY STATES ===== */
+.empty-state {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--text-faint);
+}
+
+.empty-state .emoji {
+  font-size: 36px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.empty-state .text {
+  font-size: 13px;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.btn-primary:active { transform: scale(0.97); background: var(--accent-soft); }
+
+.btn-secondary {
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px dashed var(--border-strong);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-add {
+  width: 100%;
+  padding: 14px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  margin-bottom: 14px;
+}
+
+.btn-add:active { background: var(--bg-elev); }
+
+/* ===== MEDICATION CARDS ===== */
+.med-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.med-card .med-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.med-card .med-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.med-card .med-dose {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.med-card .med-tag {
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.med-card .med-times {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.med-card .med-time-pill {
+  background: var(--bg-elev);
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-family: 'Fraunces', serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+}
+
+.med-card .med-stock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.med-card .stock-info { color: var(--text-dim); }
+.med-card .stock-info b { color: var(--text); font-weight: 600; }
+.med-card .stock-info.low b { color: var(--warning); }
+.med-card .stock-info.critical b { color: var(--danger); }
+
+.med-card .med-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.med-card .med-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: none;
+  align-items: flex-end;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-overlay.active {
+  display: flex;
+  animation: fadeOverlay 0.2s ease;
+}
+
+@keyframes fadeOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background: var(--bg-elev);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 24px 20px calc(24px + var(--safe-bottom));
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.modal-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  margin: -12px auto 16px;
+}
+
+.modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+
+.modal-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.field-input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.field-input:focus { border-color: var(--accent); }
+
+textarea.field-input {
+  resize: none;
+  min-height: 70px;
+  line-height: 1.5;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.times-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 48px;
+  align-items: center;
+}
+
+.time-chip {
+  background: var(--accent-dim);
+  color: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-family: 'Fraunces', serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-chip .x {
+  cursor: pointer;
+  opacity: 0.6;
+  font-weight: 700;
+}
+
+.time-input-wrap {
+  display: flex;
+  gap: 8px;
+}
+
+.time-input-wrap input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--text);
+  font-family: 'Fraunces', serif;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions .btn { flex: 1; }
+
+/* ===== CHART ===== */
+.chart-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
+.chart-line { stroke: var(--accent); stroke-width: 2; fill: none; }
+.chart-area { fill: url(#chartGradient); opacity: 0.3; }
+.chart-dot { fill: var(--accent); }
+.chart-dot-stroke { stroke: var(--bg); stroke-width: 2; }
+.chart-grid { stroke: var(--border); stroke-dasharray: 2 4; }
+.chart-label { fill: var(--text-faint); font-size: 10px; font-family: 'Manrope', sans-serif; }
+
+/* ===== SETTINGS ===== */
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.setting-item:last-child { border-bottom: none; }
+
+.setting-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-elev);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.setting-info { flex: 1; min-width: 0; }
+.setting-label { font-weight: 600; font-size: 14px; }
+.setting-value { font-size: 12px; color: var(--text-dim); }
+
+.setting-arrow { color: var(--text-faint); font-size: 18px; }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed;
+  top: calc(20px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-strong);
+  padding: 12px 18px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 2000;
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.success { border-color: var(--success); }
+.toast.error { border-color: var(--danger); }
+
+/* ===== LOGIN SCREEN ===== */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+  z-index: 9999;
+}
+
+.login-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255, 140, 66, 0.15), transparent 70%),
+    radial-gradient(ellipse 50% 30% at 50% 100%, rgba(255, 140, 66, 0.08), transparent 70%);
+  pointer-events: none;
+}
+
+.login-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.login-emoji {
+  font-size: 56px;
+  margin-bottom: 16px;
+}
+
+.login-title {
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+.login-title b {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.login-subtitle {
+  color: var(--text-dim);
+  margin-bottom: 32px;
+  font-size: 14px;
+}
+
+.login-form { text-align: left; }
+
+.login-tabs {
+  display: flex;
+  background: var(--bg-elev);
+  border-radius: 100px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.login-tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+
+.login-tab.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ===== TIMELINE ===== */
+.timeline-item {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 18px;
+  position: relative;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 36px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--border);
+}
+
+.timeline-item:last-child::before { display: none; }
+
+.timeline-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-content { flex: 1; min-width: 0; padding-top: 2px; }
+
+.timeline-date {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.timeline-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.timeline-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+/* ===== TEST RESULTS ===== */
+.test-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.test-row:last-child { border-bottom: none; }
+
+.test-name { font-size: 13px; font-weight: 500; }
+.test-value { font-family: 'Fraunces', serif; font-weight: 500; font-variant-numeric: tabular-nums; }
+.test-trend { font-size: 11px; color: var(--text-faint); width: 50px; text-align: right; }
+.test-trend.up { color: var(--danger); }
+.test-trend.down { color: var(--success); }
+
+/* ===== SEGMENT CONTROL ===== */
+.segment {
+  display: flex;
+  background: var(--bg-elev);
+  border-radius: 100px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+}
+
+.segment-item {
+  flex: 1;
+  padding: 8px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+
+.segment-item.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ===== PHOTO INPUT ===== */
+input[type="file"] { display: none; }
+
+/* ===== UTILITIES ===== */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px -20px;
+}
+
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gap-col { display: flex; flex-direction: column; gap: 8px; }
+
+.text-dim { color: var(--text-dim); }
+.text-faint { color: var(--text-faint); }
+.text-accent { color: var(--accent); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger { color: var(--danger); }
+
+.font-display { font-family: 'Fraunces', serif; font-weight: 500; letter-spacing: -0.01em; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-sm { margin-bottom: 8px; }
+.mb-md { margin-bottom: 16px; }
+
+.hidden { display: none !important; }
+
+/* ===== SYNC INDICATOR ===== */
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+}
+.sync-dot.syncing { background: var(--warning); animation: pulse 1.5s infinite; }
+.sync-dot.offline { background: var(--text-faint); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===== MOBILE OPTIMIZATIONS ===== */
+@media (max-width: 360px) {
+  .screen { padding-left: 16px; padding-right: 16px; }
+  .profile-name { font-size: 28px; }
+  .today-grid { gap: 8px; }
+  .stat-card { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-content">
+    <div class="login-emoji">🐾</div>
+    <h1 class="login-title">Bihter <b>Sağlık</b></h1>
+    <p class="login-subtitle">Bulutta güvenle senkron, AES-256 şifreli</p>
+
+    <div class="login-tabs">
+      <div class="login-tab active" id="tabLogin" onclick="setLoginMode('login')">Giriş Yap</div>
+      <div class="login-tab" id="tabRegister" onclick="setLoginMode('register')">Yeni Hesap</div>
+    </div>
+
+    <div class="login-form">
+      <div class="field">
+        <label class="field-label">Bulut ID</label>
+        <input type="text" class="field-input" id="loginCloudId" placeholder="ör: bihter-evim" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label">Şifre</label>
+        <input type="password" class="field-input" id="loginPass" placeholder="••••••••" autocomplete="off">
+      </div>
+      <button class="btn btn-primary btn-block" id="loginSubmit" onclick="doLogin()" style="margin-top: 8px;">Giriş Yap</button>
+      <p class="text-dim" style="text-size: 11px; text-align: center; margin-top: 14px; font-size: 11px; line-height: 1.6;">
+        Aynı Bulut ID ve şifreyle başka cihazdan da giriş yaparak verilerine ulaşabilirsin.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+
+  <!-- HOME -->
+  <section class="screen active" id="screen-home">
+    <div class="screen-header">
+      <div class="screen-title"><em>Bugün</em></div>
+      <button class="icon-btn" onclick="openSettings()" title="Ayarlar">⚙</button>
+    </div>
+
+    <!-- Profile -->
+    <div class="profile-hero">
+      <label class="profile-photo" id="profilePhoto">
+        <span id="profilePhotoFallback">🐱</span>
+        <span class="upload-hint">Foto Yükle</span>
+        <input type="file" id="photoInput" accept="image/*">
+      </label>
+      <div class="profile-name" id="profileName">Bihter</div>
+      <div class="profile-age" id="profileAge">—</div>
+      <div class="profile-tags" id="profileTags"></div>
+    </div>
+
+    <!-- Vet Emergency -->
+    <a class="vet-call" id="vetCallBtn" href="#" onclick="callVet(event)">
+      <div class="vet-icon">📞</div>
+      <div class="vet-info">
+        <div class="vet-label">Acil • Veteriner</div>
+        <div class="vet-name" id="vetName">Veteriner ekle</div>
+        <div class="vet-phone" id="vetPhone">Ayarlardan tanımla</div>
+      </div>
+    </a>
+
+    <!-- Today Stats -->
+    <div class="today-grid">
+      <div class="stat-card">
+        <div class="stat-emoji">💊</div>
+        <div class="stat-label">İlaç</div>
+        <div class="stat-value" id="statMeds">0/0</div>
+        <div class="stat-sub" id="statMedsSub">bugün</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">🍽️</div>
+        <div class="stat-label">Yemek</div>
+        <div class="stat-value" id="statMeals">0/0</div>
+        <div class="stat-sub" id="statMealsSub">öğün</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">💧</div>
+        <div class="stat-label">Su</div>
+        <div class="stat-value" id="statWater">0 ml</div>
+        <div class="stat-sub">bugün</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-emoji">⚖️</div>
+        <div class="stat-label">Kilo</div>
+        <div class="stat-value" id="statWeight">—</div>
+        <div class="stat-sub" id="statWeightSub">son ölçüm</div>
+      </div>
+    </div>
+
+    <!-- Today's Meds Quick -->
+    <div class="card">
+      <div class="card-title">
+        <span>Bugünün İlaçları</span>
+        <span class="action" onclick="goTo('meds')">Tümü ›</span>
+      </div>
+      <div id="todayMedsList">
+        <div class="empty-state">
+          <div class="emoji">💊</div>
+          <div class="text">Henüz ilaç tanımlanmadı</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today's Meals -->
+    <div class="card">
+      <div class="card-title">
+        <span>Bugünün Öğünleri</span>
+        <span class="action" onclick="goTo('meals')">Tümü ›</span>
+      </div>
+      <div id="todayMealsList">
+        <div class="empty-state">
+          <div class="emoji">🍽️</div>
+          <div class="text">Henüz öğün planı yok</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Water -->
+    <div class="card">
+      <div class="card-title">
+        <span>Su Tüketimi</span>
+        <span class="action" id="waterTodayMl">0 ml</span>
+      </div>
+      <div class="flex-row" style="gap: 8px;">
+        <button class="btn btn-secondary" onclick="addWater(20)" style="flex:1; padding: 10px;">+20 ml</button>
+        <button class="btn btn-secondary" onclick="addWater(50)" style="flex:1; padding: 10px;">+50 ml</button>
+        <button class="btn btn-secondary" onclick="addWater(100)" style="flex:1; padding: 10px;">+100 ml</button>
+        <button class="icon-btn" onclick="resetWater()" title="Sıfırla" style="flex-shrink: 0;">↺</button>
+      </div>
+    </div>
+
+    <!-- Mood -->
+    <div class="card">
+      <div class="card-title">
+        <span>Bugün Nasıldı?</span>
+      </div>
+      <div class="mood-tags" id="moodTags">
+        <div class="mood-tag" data-mood="energetic">⚡ Enerjik</div>
+        <div class="mood-tag" data-mood="playful">🎾 Oyuncu</div>
+        <div class="mood-tag" data-mood="calm">😌 Sakin</div>
+        <div class="mood-tag" data-mood="tired">😴 Uyuşuk</div>
+        <div class="mood-tag" data-mood="hidden">🙈 Saklandı</div>
+        <div class="mood-tag" data-mood="vomit">🤮 Kustu</div>
+        <div class="mood-tag" data-mood="diarrhea">💩 İshal</div>
+        <div class="mood-tag" data-mood="breathing">😮‍💨 Nefes Sorunu</div>
+      </div>
+      <textarea class="note-input" id="dailyNote" placeholder="Bugünden notlar... (örn. çok yedi, kustu, oynamak istemedi)"></textarea>
+    </div>
+
+    <!-- Upcoming -->
+    <div class="card">
+      <div class="card-title"><span>Yaklaşanlar</span></div>
+      <div id="upcomingList">
+        <div class="empty-state">
+          <div class="emoji">✨</div>
+          <div class="text">Yaklaşan bir şey yok</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; padding: 20px 0; font-size: 11px; color: var(--text-faint);">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncStatus">Senkronize</span> • <span id="cloudIdLabel">—</span>
+    </div>
+  </section>
+
+  <!-- MEDS -->
+  <section class="screen" id="screen-meds">
+    <div class="screen-header">
+      <div class="screen-title"><em>İlaçlar</em></div>
+      <button class="icon-btn" onclick="openMedModal()">+</button>
+    </div>
+
+    <div class="segment" id="medSegment">
+      <div class="segment-item active" data-tab="active">Aktif</div>
+      <div class="segment-item" data-tab="today">Bugün</div>
+      <div class="segment-item" data-tab="archive">Arşiv</div>
+    </div>
+
+    <div id="medsList"></div>
+  </section>
+
+  <!-- MEALS -->
+  <section class="screen" id="screen-meals">
+    <div class="screen-header">
+      <div class="screen-title"><em>Yemek</em></div>
+      <button class="icon-btn" onclick="openMealModal()">+</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>Bugünün Öğünleri</span></div>
+      <div id="mealsTodayList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>Son 7 Gün İştah</span></div>
+      <div id="appetiteChart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>Su Tüketimi (7 gün)</span></div>
+      <div id="waterChart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Mama Bilgileri</span>
+        <span class="action" onclick="openFoodInfoModal()">Düzenle ›</span>
+      </div>
+      <div id="foodInfoView">
+        <div class="empty-state">
+          <div class="emoji">🍲</div>
+          <div class="text">Mama bilgisi henüz girilmedi</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HEALTH -->
+  <section class="screen" id="screen-health">
+    <div class="screen-header">
+      <div class="screen-title"><em>Sağlık</em></div>
+    </div>
+
+    <div class="segment" id="healthSegment">
+      <div class="segment-item active" data-tab="weight">Kilo</div>
+      <div class="segment-item" data-tab="tests">Tahlil</div>
+      <div class="segment-item" data-tab="vacc">Aşı</div>
+      <div class="segment-item" data-tab="history">Geçmiş</div>
+    </div>
+
+    <div id="healthContent"></div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="screen" id="screen-calendar">
+    <div class="screen-header">
+      <div class="screen-title"><em>Takvim</em></div>
+      <button class="icon-btn" onclick="openEventModal()">+</button>
+    </div>
+
+    <div class="segment" id="calSegment">
+      <div class="segment-item active" data-tab="upcoming">Yaklaşan</div>
+      <div class="segment-item" data-tab="past">Geçmiş</div>
+    </div>
+
+    <div id="calendarList"></div>
+  </section>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-screen="home"><span class="icon">🏠</span><span class="label">Ana</span></button>
+    <button class="nav-item" data-screen="meds"><span class="icon">💊</span><span class="label">İlaç</span></button>
+    <button class="nav-item" data-screen="meals"><span class="icon">🍽️</span><span class="label">Yemek</span></button>
+    <button class="nav-item" data-screen="health"><span class="icon">📊</span><span class="label">Sağlık</span></button>
+    <button class="nav-item" data-screen="calendar"><span class="icon">📅</span><span class="label">Takvim</span></button>
+  </nav>
+</div>
+
+<!-- MODAL CONTAINER -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal" id="modalBox" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase + Crypto -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<script>
+// ============================================================
+// FIREBASE CONFIG — kullanıcı kendi config'ini buraya yapıştırır
+// ============================================================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCyAnpELLloyLp2wut6DPoI76xQTtesxAc",
+  authDomain: "kart-takip-a69f7.firebaseapp.com",
+  projectId: "kart-takip-a69f7",
+  storageBucket: "kart-takip-a69f7.firebasestorage.app",
+  messagingSenderId: "864294416967",
+  appId: "1:864294416967:web:4d06f9696bc13f836af762"
+};
+
+let db = null;
+let firestoreReady = false;
+try {
+  if (FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith("REPLACE")) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    firestoreReady = true;
+  }
+} catch (e) { console.warn("Firebase başlatılamadı:", e); }
+
+// ============================================================
+// STATE
+// ============================================================
+const STATE = {
+  cloudId: null,
+  password: null,
+  data: {
+    profile: { name: "Bihter", species: "cat", birthDate: "2023-06-20", photo: null,
+      conditions: ["HCM", "Böbrek", "Karaciğer"],
+      vetName: "", vetPhone: "", vetAddress: "", notificationsEnabled: false },
+    meds: [], medLogs: {}, foods: [], mealLogs: {},
+    foodInfo: { brand: "", type: "", notes: "" },
+    waterLogs: {}, weights: [], tests: [], vaccines: [], events: [], history: [], moods: {},
+    parasiteSchedule: { lastDate: null, intervalMonths: 3, name: "Parazit ilacı" }
+  },
+  view: { currentScreen: "home", medFilter: "active", healthFilter: "weight", calFilter: "upcoming", loginMode: "login" },
+  notificationTimers: []
+};
+
+// ============================================================
+// CRYPTO + HELPERS
+// ============================================================
+function encrypt(text, password) { return CryptoJS.AES.encrypt(text, password).toString(); }
+function decrypt(cipher, password) {
+  try { const bytes = CryptoJS.AES.decrypt(cipher, password); const t = bytes.toString(CryptoJS.enc.Utf8); if (!t) throw new Error("fail"); return t; }
+  catch (e) { return null; }
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function todayKey(d = new Date()) { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+function parseDate(key) { const [y,m,d] = key.split('-').map(Number); return new Date(y, m-1, d); }
+function fmtDate(d) { if (typeof d === 'string') d = parseDate(d); const M=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; }
+function fmtDateShort(d) { if (typeof d === 'string') d = parseDate(d); const M=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara']; return `${d.getDate()} ${M[d.getMonth()]}`; }
+function ageString(birthDateStr) {
+  if (!birthDateStr) return "—";
+  const birth = new Date(birthDateStr); const now = new Date();
+  let years = now.getFullYear() - birth.getFullYear();
+  let months = now.getMonth() - birth.getMonth();
+  let days = now.getDate() - birth.getDate();
+  if (days < 0) months--;
+  if (months < 0) { years--; months += 12; }
+  if (years > 0 && months > 0) return `${years} yaş ${months} ay`;
+  if (years > 0) return `${years} yaş`;
+  if (months > 0) return `${months} ay`;
+  return `${Math.floor((now - birth) / 86400000)} gün`;
+}
+function toast(msg, type = "") { const el = document.getElementById('toast'); el.textContent = msg; el.className = 'toast show ' + type; setTimeout(() => el.classList.remove('show'), 2400); }
+function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setSyncStatus(state, text) { const dot = document.getElementById('syncDot'); const lbl = document.getElementById('syncStatus'); dot.className = 'sync-dot ' + (state === 'ok' ? '' : state); lbl.textContent = text; }
+
+// ============================================================
+// FIRESTORE SYNC
+// ============================================================
+let saveDebounceTimer = null;
+let firestoreUnsub = null;
+async function pushToCloud() {
+  if (!firestoreReady || !STATE.cloudId || !STATE.password) return;
+  setSyncStatus('syncing', 'Senkronize ediliyor...');
+  try {
+    const cipher = encrypt(JSON.stringify(STATE.data), STATE.password);
+    await db.collection('bihter_app').doc(STATE.cloudId).set({ payload: cipher, updatedAt: Date.now() });
+    setSyncStatus('ok', 'Senkronize');
+  } catch (e) { console.error(e); setSyncStatus('offline', 'Çevrimdışı'); }
+}
+function queueSave() { saveLocal(); clearTimeout(saveDebounceTimer); saveDebounceTimer = setTimeout(pushToCloud, 800); }
+function saveLocal() {
+  try {
+    if (STATE.cloudId && STATE.password) {
+      const cipher = encrypt(JSON.stringify(STATE.data), STATE.password);
+      localStorage.setItem('bihter_data_' + STATE.cloudId, cipher);
+      localStorage.setItem('bihter_session', JSON.stringify({ cloudId: STATE.cloudId }));
+    }
+  } catch(e) { console.warn(e); }
+}
+function loadLocal(cloudId, password) {
+  try {
+    const cipher = localStorage.getItem('bihter_data_' + cloudId); if (!cipher) return null;
+    const json = decrypt(cipher, password); if (!json) return null;
+    return JSON.parse(json);
+  } catch(e) { return null; }
+}
+async function fetchFromCloud(cloudId, password) {
+  if (!firestoreReady) return null;
+  try {
+    const doc = await db.collection('bihter_app').doc(cloudId).get();
+    if (!doc.exists) return null;
+    const json = decrypt(doc.data().payload, password);
+    if (!json) return 'wrong-password';
+    return JSON.parse(json);
+  } catch (e) { console.error(e); return null; }
+}
+function startCloudListener() {
+  if (!firestoreReady || !STATE.cloudId || !STATE.password) return;
+  if (firestoreUnsub) firestoreUnsub();
+  firestoreUnsub = db.collection('bihter_app').doc(STATE.cloudId).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const json = decrypt(doc.data().payload, STATE.password); if (!json) return;
+    try {
+      const remote = JSON.parse(json);
+      if (JSON.stringify(STATE.data) !== json) {
+        STATE.data = mergeData(STATE.data, remote);
+        renderAll(); scheduleNotifications();
+      }
+      setSyncStatus('ok', 'Senkronize');
+    } catch(e) { console.warn(e); }
+  }, err => { console.warn(err); setSyncStatus('offline', 'Çevrimdışı'); });
+}
+function mergeData(local, remote) {
+  const merged = { ...remote };
+  ['medLogs','mealLogs','waterLogs','moods'].forEach(key => {
+    merged[key] = { ...(remote[key]||{}), ...(local[key]||{}) };
+  });
+  return merged;
+}
+
+// ============================================================
+// LOGIN
+// ============================================================
+function setLoginMode(mode) {
+  STATE.view.loginMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', mode === 'register');
+  document.getElementById('loginSubmit').textContent = mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur';
+}
+async function doLogin() {
+  const cloudId = document.getElementById('loginCloudId').value.trim().toLowerCase();
+  const password = document.getElementById('loginPass').value;
+  if (!cloudId || !password) { toast('Bulut ID ve şifre gerekli', 'error'); return; }
+  if (cloudId.length < 3) { toast('Bulut ID en az 3 karakter', 'error'); return; }
+  if (password.length < 4) { toast('Şifre en az 4 karakter', 'error'); return; }
+  const btn = document.getElementById('loginSubmit');
+  btn.textContent = 'Bekleyin...'; btn.disabled = true;
+  try {
+    if (STATE.view.loginMode === 'login') {
+      let data = null;
+      if (firestoreReady) {
+        data = await fetchFromCloud(cloudId, password);
+        if (data === 'wrong-password') { toast('Şifre hatalı', 'error'); btn.textContent = 'Giriş Yap'; btn.disabled = false; return; }
+      }
+      if (!data) data = loadLocal(cloudId, password);
+      if (!data) { toast('Hesap bulunamadı. Yeni hesap oluştur.', 'error'); btn.textContent = 'Giriş Yap'; btn.disabled = false; return; }
+      STATE.cloudId = cloudId; STATE.password = password;
+      STATE.data = { ...STATE.data, ...data };
+      enterApp();
+    } else {
+      if (firestoreReady) {
+        const existing = await fetchFromCloud(cloudId, password);
+        if (existing && existing !== 'wrong-password') { toast('Bu Bulut ID kullanımda. Giriş Yap.', 'error'); btn.textContent = 'Hesap Oluştur'; btn.disabled = false; return; }
+        if (existing === 'wrong-password') { toast('Bu ID kullanımda. Farklı ID seç.', 'error'); btn.textContent = 'Hesap Oluştur'; btn.disabled = false; return; }
+      }
+      STATE.cloudId = cloudId; STATE.password = password;
+      saveLocal(); await pushToCloud();
+      enterApp();
+    }
+  } catch(e) { console.error(e); toast('Hata oluştu', 'error'); btn.textContent = STATE.view.loginMode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'; btn.disabled = false; }
+}
+function enterApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('cloudIdLabel').textContent = STATE.cloudId;
+  startCloudListener();
+  renderAll();
+  scheduleNotifications();
+  setTimeout(() => requestNotificationPermission(), 1500);
+}
+function logout() {
+  if (firestoreUnsub) firestoreUnsub();
+  localStorage.removeItem('bihter_session');
+  STATE.cloudId = null; STATE.password = null;
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('loginCloudId').value = '';
+  document.getElementById('loginPass').value = '';
+  closeModal();
+}
+
+// ============================================================
+// NAVIGATION + MODAL
+// ============================================================
+function goTo(screen) {
+  STATE.view.currentScreen = screen;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.screen === screen));
+  if (screen === 'home') renderHome();
+  if (screen === 'meds') renderMeds();
+  if (screen === 'meals') renderMeals();
+  if (screen === 'health') renderHealth();
+  if (screen === 'calendar') renderCalendar();
+  document.getElementById('screen-' + screen).scrollTop = 0;
+}
+document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => goTo(n.dataset.screen)));
+function openModal(html) { document.getElementById('modalContent').innerHTML = html; document.getElementById('modalOverlay').classList.add('active'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+function closeModalOnBg(e) { if (e.target.id === 'modalOverlay') closeModal(); }
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderAll() { renderHome(); renderMeds(); renderMeals(); renderHealth(); renderCalendar(); }
+
+function renderHome() {
+  const p = STATE.data.profile;
+  document.getElementById('profileName').textContent = p.name || 'Bihter';
+  document.getElementById('profileAge').textContent = ageString(p.birthDate);
+  const photoEl = document.getElementById('profilePhoto');
+  const fallback = document.getElementById('profilePhotoFallback');
+  const existingImg = photoEl.querySelector('img'); if (existingImg) existingImg.remove();
+  if (p.photo) {
+    fallback.style.display = 'none';
+    const img = document.createElement('img'); img.src = p.photo;
+    photoEl.insertBefore(img, photoEl.firstChild);
+  } else {
+    fallback.style.display = ''; fallback.textContent = p.species === 'cat' ? '🐱' : '🐶';
+  }
+  document.getElementById('profileTags').innerHTML = (p.conditions||[]).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('');
+  document.getElementById('vetName').textContent = p.vetName || 'Veteriner ekle';
+  document.getElementById('vetPhone').textContent = p.vetPhone || 'Ayarlardan tanımla';
+
+  const today = todayKey();
+  const todayMedLog = STATE.data.medLogs[today] || {};
+  const activeMeds = STATE.data.meds.filter(m => m.active);
+  let totalMedDoses = 0, takenMedDoses = 0;
+  activeMeds.forEach(m => {
+    const taken = todayMedLog[m.id] || {};
+    totalMedDoses += (m.times||[]).length;
+    takenMedDoses += Object.keys(taken).length;
+  });
+  document.getElementById('statMeds').textContent = `${takenMedDoses}/${totalMedDoses}`;
+  document.getElementById('statMedsSub').textContent = totalMedDoses ? 'doz alındı' : 'plan yok';
+
+  const todayMealLog = STATE.data.mealLogs[today] || {};
+  const totalMeals = STATE.data.foods.length;
+  const loggedMeals = Object.keys(todayMealLog).length;
+  document.getElementById('statMeals').textContent = `${loggedMeals}/${totalMeals}`;
+  document.getElementById('statMealsSub').textContent = totalMeals ? 'işaretlendi' : 'plan yok';
+
+  const water = STATE.data.waterLogs[today] || 0;
+  document.getElementById('statWater').textContent = `${water} ml`;
+  document.getElementById('waterTodayMl').textContent = `${water} ml`;
+
+  if (STATE.data.weights.length > 0) {
+    const last = STATE.data.weights[STATE.data.weights.length - 1];
+    document.getElementById('statWeight').textContent = last.kg + ' kg';
+    document.getElementById('statWeightSub').textContent = fmtDateShort(last.date);
+  } else {
+    document.getElementById('statWeight').textContent = '—';
+    document.getElementById('statWeightSub').textContent = 'kayıt yok';
+  }
+
+  renderTodayMedsList(); renderTodayMealsList(); renderUpcoming(); renderMoodTags();
+  const moodToday = STATE.data.moods[today] || { tags: [], note: '' };
+  document.getElementById('dailyNote').value = moodToday.note || '';
+}
+
+function renderTodayMedsList() {
+  const today = todayKey();
+  const log = STATE.data.medLogs[today] || {};
+  const active = STATE.data.meds.filter(m => m.active);
+  if (active.length === 0) {
+    document.getElementById('todayMedsList').innerHTML = `<div class="empty-state"><div class="emoji">💊</div><div class="text">Henüz ilaç tanımlanmadı</div><button class="btn btn-ghost" style="margin-top: 12px;" onclick="goTo('meds'); openMedModal()">İlaç Ekle</button></div>`;
+    return;
+  }
+  const rows = [];
+  active.forEach(m => (m.times || []).forEach(t => rows.push({ med: m, time: t, taken: !!(log[m.id] && log[m.id][t]) })));
+  rows.sort((a,b) => a.time.localeCompare(b.time));
+  document.getElementById('todayMedsList').innerHTML = rows.map(r => `
+    <div class="check-item ${r.taken ? 'done' : ''}" onclick="toggleMedDose('${r.med.id}', '${r.time}')">
+      <div class="check-box ${r.taken ? 'checked' : ''}"></div>
+      <div class="check-info">
+        <div class="check-name">${escapeHtml(r.med.name)}</div>
+        <div class="check-meta">${escapeHtml(r.med.dose||'')} ${r.med.condition ? '• '+escapeHtml(r.med.condition) : ''}</div>
+      </div>
+      <div class="check-time">${r.time}</div>
+    </div>`).join('');
+}
+
+function renderTodayMealsList() {
+  const today = todayKey();
+  const log = STATE.data.mealLogs[today] || {};
+  const foods = [...STATE.data.foods].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  if (foods.length === 0) {
+    document.getElementById('todayMealsList').innerHTML = `<div class="empty-state"><div class="emoji">🍽️</div><div class="text">Öğün planı yok</div><button class="btn btn-ghost" style="margin-top: 12px;" onclick="goTo('meals'); openMealModal()">Öğün Ekle</button></div>`;
+    return;
+  }
+  document.getElementById('todayMealsList').innerHTML = foods.map(f => {
+    const v = log[f.id];
+    return `<div class="meal-row">
+      <div class="meal-time">${f.time||'—'}</div>
+      <div class="meal-info"><div class="meal-name">${escapeHtml(f.name)}</div><div class="meal-desc">${escapeHtml(f.amount||'')}</div></div>
+      <div class="meal-scale">
+        <div class="scale-btn ${v==='full'?'active':''}" data-val="full" onclick="setMealLog('${f.id}','full')">🟢</div>
+        <div class="scale-btn ${v==='half'?'active':''}" data-val="half" onclick="setMealLog('${f.id}','half')">🟡</div>
+        <div class="scale-btn ${v==='none'?'active':''}" data-val="none" onclick="setMealLog('${f.id}','none')">🔴</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderMoodTags() {
+  const today = todayKey();
+  const m = STATE.data.moods[today] || { tags: [] };
+  document.querySelectorAll('#moodTags .mood-tag').forEach(el => el.classList.toggle('active', m.tags.includes(el.dataset.mood)));
+}
+
+function renderUpcoming() {
+  const items = []; const today = new Date();
+  STATE.data.meds.forEach(m => {
+    if (!m.active) return;
+    const dailyDoses = (m.times||[]).length * (parseFloat(m.perDose)||1);
+    if (m.stock && dailyDoses > 0) {
+      const daysLeft = Math.floor(parseFloat(m.stock) / dailyDoses);
+      if (daysLeft <= 7) items.push({ icon: '⚠️', iconClass: daysLeft <= 3 ? 'danger' : 'warning', title: `${m.name} stoku azalıyor`, meta: `${daysLeft} gün kaldı (${m.stock} ${m.stockUnit||''})`, sortKey: daysLeft });
+    }
+  });
+  STATE.data.events.forEach(e => {
+    if (e.done) return;
+    const eDate = parseDate(e.date);
+    const daysUntil = Math.ceil((eDate - today) / 86400000);
+    if (daysUntil >= 0 && daysUntil <= 30) {
+      const icons = {vet:'🏥', vaccine:'💉', parasite:'🐛', grooming:'✂️', other:'📌'};
+      items.push({ icon: icons[e.type] || '📌', iconClass: 'info', title: e.title, meta: daysUntil === 0 ? 'Bugün' + (e.time?' • '+e.time:'') : daysUntil === 1 ? 'Yarın' : `${daysUntil} gün sonra • ${fmtDateShort(e.date)}`, sortKey: daysUntil + 100 });
+    }
+  });
+  STATE.data.vaccines.forEach(v => {
+    if (!v.nextDate) return;
+    const daysUntil = Math.ceil((parseDate(v.nextDate) - today) / 86400000);
+    if (daysUntil >= 0 && daysUntil <= 30) items.push({ icon: '💉', iconClass: 'info', title: `${v.name} aşısı`, meta: daysUntil === 0 ? 'Bugün' : `${daysUntil} gün sonra • ${fmtDateShort(v.nextDate)}`, sortKey: daysUntil + 50 });
+  });
+  const ps = STATE.data.parasiteSchedule;
+  if (ps.lastDate) {
+    const next = new Date(parseDate(ps.lastDate)); next.setMonth(next.getMonth() + (ps.intervalMonths||3));
+    const daysUntil = Math.ceil((next - today) / 86400000);
+    if (daysUntil <= 14) items.push({ icon: '🐛', iconClass: daysUntil < 0 ? 'danger' : 'warning', title: ps.name || 'Parazit ilacı', meta: daysUntil < 0 ? `${-daysUntil} gün gecikti` : daysUntil === 0 ? 'Bugün vakti' : `${daysUntil} gün sonra`, sortKey: daysUntil });
+  }
+  items.sort((a,b) => a.sortKey - b.sortKey);
+  if (items.length === 0) {
+    document.getElementById('upcomingList').innerHTML = `<div class="empty-state"><div class="emoji">✨</div><div class="text">Yaklaşan bir şey yok</div></div>`; return;
+  }
+  document.getElementById('upcomingList').innerHTML = items.slice(0, 6).map(i => `
+    <div class="alert-item">
+      <div class="alert-icon ${i.iconClass}">${i.icon}</div>
+      <div class="alert-info"><div class="alert-title">${escapeHtml(i.title)}</div><div class="alert-meta">${escapeHtml(i.meta)}</div></div>
+    </div>`).join('');
+}
+
+function renderMeds() {
+  const filter = STATE.view.medFilter;
+  let meds = STATE.data.meds;
+  if (filter === 'active') meds = meds.filter(m => m.active);
+  else if (filter === 'archive') meds = meds.filter(m => !m.active);
+  const container = document.getElementById('medsList');
+  if (filter === 'today') {
+    const today = todayKey();
+    const log = STATE.data.medLogs[today] || {};
+    const active = STATE.data.meds.filter(m => m.active);
+    const rows = [];
+    active.forEach(m => (m.times||[]).forEach(t => rows.push({ med: m, time: t, taken: !!(log[m.id] && log[m.id][t]) })));
+    rows.sort((a,b) => a.time.localeCompare(b.time));
+    if (rows.length === 0) { container.innerHTML = `<div class="card"><div class="empty-state"><div class="emoji">💊</div><div class="text">Bugün için ilaç yok</div></div></div>`; return; }
+    container.innerHTML = `<div class="card">${rows.map(r => `
+      <div class="check-item ${r.taken?'done':''}" onclick="toggleMedDose('${r.med.id}','${r.time}')">
+        <div class="check-box ${r.taken?'checked':''}"></div>
+        <div class="check-info"><div class="check-name">${escapeHtml(r.med.name)}</div><div class="check-meta">${escapeHtml(r.med.dose||'')} ${r.med.condition ? '• '+escapeHtml(r.med.condition) : ''}</div></div>
+        <div class="check-time">${r.time}</div>
+      </div>`).join('')}</div>`;
+    return;
+  }
+  if (meds.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">💊</div><div class="text">${filter==='archive'?'Arşivde ilaç yok':'Henüz ilaç eklenmedi'}</div>${filter==='active'?'<button class="btn btn-primary" style="margin-top: 16px;" onclick="openMedModal()">İlk İlacı Ekle</button>':''}</div>`;
+    return;
+  }
+  container.innerHTML = meds.map(m => {
+    const dailyDoses = (m.times||[]).length * (parseFloat(m.perDose)||1);
+    const stock = parseFloat(m.stock) || 0;
+    const daysLeft = dailyDoses > 0 ? Math.floor(stock / dailyDoses) : null;
+    const stockClass = daysLeft !== null && daysLeft <= 3 ? 'critical' : daysLeft !== null && daysLeft <= 7 ? 'low' : '';
+    return `<div class="med-card">
+      <div class="med-head">
+        <div><div class="med-title">${escapeHtml(m.name)}</div><div class="med-dose">${escapeHtml(m.dose || '')} ${m.perDose ? '• '+escapeHtml(m.perDose+' '+(m.doseUnit||''))+' /doz' : ''}</div></div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          ${m.condition ? `<span class="med-tag">${escapeHtml(m.condition)}</span>` : ''}
+          <button class="med-action" onclick="openMedModal('${m.id}')">✎</button>
+          <button class="med-action" onclick="toggleMedActive('${m.id}')" title="${m.active?'Arşivle':'Aktifleştir'}">${m.active?'📦':'↩'}</button>
+        </div>
+      </div>
+      <div class="med-times">${(m.times||[]).map(t => `<span class="med-time-pill">${t}</span>`).join('')}</div>
+      ${m.notes ? `<div style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">${escapeHtml(m.notes)}</div>` : ''}
+      <div class="med-stock">
+        <span class="stock-info ${stockClass}">Stok: <b>${m.stock || 0} ${escapeHtml(m.stockUnit||'')}</b>${daysLeft !== null ? ` • ${daysLeft} gün` : ''}</span>
+        <button class="med-action" onclick="adjustStock('${m.id}')" title="Stok güncelle">📦</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+document.querySelectorAll('#medSegment .segment-item').forEach(seg => {
+  seg.addEventListener('click', () => {
+    document.querySelectorAll('#medSegment .segment-item').forEach(s => s.classList.remove('active'));
+    seg.classList.add('active'); STATE.view.medFilter = seg.dataset.tab; renderMeds();
+  });
+});
+
+function renderMeals() {
+  const today = todayKey();
+  const log = STATE.data.mealLogs[today] || {};
+  const foods = [...STATE.data.foods].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  document.getElementById('mealsTodayList').innerHTML = foods.length === 0
+    ? `<div class="empty-state"><div class="emoji">🍽️</div><div class="text">Henüz öğün planı yok</div><button class="btn btn-primary" style="margin-top: 12px;" onclick="openMealModal()">Öğün Ekle</button></div>`
+    : foods.map(f => {
+      const v = log[f.id];
+      return `<div class="meal-row">
+        <div class="meal-time">${f.time||'—'}</div>
+        <div class="meal-info"><div class="meal-name">${escapeHtml(f.name)}<span style="margin-left:8px;color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="openMealModal('${f.id}')">düzenle</span></div><div class="meal-desc">${escapeHtml(f.amount||'')}${f.notes?' • '+escapeHtml(f.notes):''}</div></div>
+        <div class="meal-scale">
+          <div class="scale-btn ${v==='full'?'active':''}" data-val="full" onclick="setMealLog('${f.id}','full')">🟢</div>
+          <div class="scale-btn ${v==='half'?'active':''}" data-val="half" onclick="setMealLog('${f.id}','half')">🟡</div>
+          <div class="scale-btn ${v==='none'?'active':''}" data-val="none" onclick="setMealLog('${f.id}','none')">🔴</div>
+        </div></div>`;
+    }).join('');
+  document.getElementById('appetiteChart').innerHTML = renderAppetiteChart();
+  document.getElementById('waterChart').innerHTML = renderWaterChart();
+  const fi = STATE.data.foodInfo;
+  if (!fi.brand && !fi.type && !fi.notes) {
+    document.getElementById('foodInfoView').innerHTML = `<div class="empty-state"><div class="emoji">🍲</div><div class="text">Mama bilgisi henüz girilmedi</div></div>`;
+  } else {
+    document.getElementById('foodInfoView').innerHTML = `
+      ${fi.brand ? `<div style="margin-bottom: 8px;"><div class="text-faint" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Marka</div><div style="font-weight: 600;">${escapeHtml(fi.brand)}</div></div>` : ''}
+      ${fi.type ? `<div style="margin-bottom: 8px;"><div class="text-faint" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Tip</div><div>${escapeHtml(fi.type)}</div></div>` : ''}
+      ${fi.notes ? `<div><div class="text-faint" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Notlar</div><div style="font-size: 13px; line-height: 1.5;">${escapeHtml(fi.notes)}</div></div>` : ''}`;
+  }
+}
+
+function renderAppetiteChart() {
+  const days = 7; const data = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = todayKey(d);
+    const log = STATE.data.mealLogs[key] || {};
+    const foods = STATE.data.foods;
+    if (foods.length === 0) { data.push({ date: d, score: null }); continue; }
+    let total = 0, count = 0;
+    foods.forEach(f => { const v = log[f.id]; if (v) { count++; total += v === 'full' ? 100 : v === 'half' ? 50 : 0; } });
+    data.push({ date: d, score: count > 0 ? total / count : null });
+  }
+  const W=320, H=160, P=30; const barGap = (W - 2*P) / days; const barW = barGap * 0.7;
+  const bars = data.map((d, i) => {
+    const x = P + i * barGap + (barGap - barW) / 2;
+    const score = d.score === null ? 0 : d.score;
+    const h = (H - P*2) * (score / 100);
+    const y = H - P - h;
+    const color = d.score === null ? 'var(--border-strong)' : d.score >= 75 ? 'var(--success)' : d.score >= 40 ? 'var(--warning)' : 'var(--danger)';
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${color}" opacity="${d.score===null?0.3:0.85}"/>
+      <text x="${x + barW/2}" y="${H - P + 14}" text-anchor="middle" class="chart-label">${d.date.getDate()}</text>
+      ${d.score !== null ? `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" class="chart-label" style="font-size: 9px;">${Math.round(d.score)}%</text>` : ''}`;
+  }).join('');
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}"><line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${H-P}" stroke="var(--border)"/>${bars}</svg>
+    <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-dim); margin-top: 10px; flex-wrap: wrap;">
+      <span><span style="display:inline-block;width:8px;height:8px;background:var(--success);border-radius:2px;margin-right:4px;"></span>İyi (75%+)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:var(--warning);border-radius:2px;margin-right:4px;"></span>Orta</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:var(--danger);border-radius:2px;margin-right:4px;"></span>Az</span>
+    </div>`;
+}
+
+function renderWaterChart() {
+  const days = 7; const data = []; let max = 0;
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ml = STATE.data.waterLogs[todayKey(d)] || 0;
+    if (ml > max) max = ml;
+    data.push({ date: d, ml });
+  }
+  if (max === 0) max = 100;
+  const W=320, H=160, P=30; const barGap = (W - 2*P) / days; const barW = barGap * 0.7;
+  const bars = data.map((d, i) => {
+    const x = P + i * barGap + (barGap - barW) / 2;
+    const h = (H - P*2) * (d.ml / max);
+    const y = H - P - h;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h||0}" rx="4" fill="var(--info)" opacity="0.8"/>
+      <text x="${x + barW/2}" y="${H - P + 14}" text-anchor="middle" class="chart-label">${d.date.getDate()}</text>
+      ${d.ml > 0 ? `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" class="chart-label" style="font-size: 9px;">${d.ml}</text>` : ''}`;
+  }).join('');
+  const avg = Math.round(data.reduce((a,b)=>a+b.ml, 0) / days);
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}"><line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${H-P}" stroke="var(--border)"/>${bars}</svg>
+    <div style="font-size: 12px; color: var(--text-dim); margin-top: 8px;">Günlük ortalama: <b style="color: var(--text);">${avg} ml</b></div>`;
+}
+</script>
+
+<script>
+// ============================================================
+// HEALTH RENDERERS
+// ============================================================
+function renderHealth() {
+  const tab = STATE.view.healthFilter;
+  const c = document.getElementById('healthContent');
+  if (tab === 'weight') c.innerHTML = renderWeightTab();
+  else if (tab === 'tests') c.innerHTML = renderTestsTab();
+  else if (tab === 'vacc') c.innerHTML = renderVaccTab();
+  else if (tab === 'history') c.innerHTML = renderHistoryTab();
+}
+function renderWeightTab() {
+  const weights = [...STATE.data.weights].sort((a,b) => a.date.localeCompare(b.date));
+  return `<button class="btn-add" onclick="openWeightModal()">+ Kilo Kaydı Ekle</button>
+    <div class="card"><div class="card-title"><span>Kilo Değişimi</span></div>
+      ${weights.length < 2 ? `<div class="empty-state"><div class="emoji">⚖️</div><div class="text">${weights.length===0?'Henüz kayıt yok':'En az 2 kayıt gerekli'}</div></div>` : renderWeightChart(weights)}
+    </div>
+    <div class="card"><div class="card-title"><span>Tüm Kayıtlar</span></div>
+      ${weights.length === 0 ? '<div class="empty-state"><div class="text">Kayıt yok</div></div>' : weights.slice().reverse().map((w, idx, arr) => {
+        const prev = arr[idx + 1];
+        const diff = prev ? (parseFloat(w.kg) - parseFloat(prev.kg)).toFixed(2) : null;
+        return `<div class="test-row" style="cursor: pointer;" onclick="deleteWeight('${w.date}', ${parseFloat(w.kg)})">
+          <div><div class="test-name">${fmtDate(w.date)}</div></div>
+          <div class="test-value">${w.kg} kg</div>
+          <div class="test-trend ${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff !== null ? (diff > 0 ? '+' : '') + diff : '—'}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+function renderWeightChart(weights) {
+  const W=320, H=180, P=30;
+  const xs = weights.map(w => parseDate(w.date).getTime());
+  const ys = weights.map(w => parseFloat(w.kg));
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const padY = (maxY - minY) * 0.2 || 0.5;
+  const yMin = Math.max(0, minY - padY), yMax = maxY + padY;
+  const xScale = x => P + ((x - minX) / (maxX - minX || 1)) * (W - 2*P);
+  const yScale = y => H - P - ((y - yMin) / (yMax - yMin || 1)) * (H - 2*P);
+  const points = weights.map(w => `${xScale(parseDate(w.date).getTime())},${yScale(parseFloat(w.kg))}`).join(' ');
+  const areaPath = `M ${xScale(parseDate(weights[0].date).getTime())},${H-P} L ${weights.map(w => `${xScale(parseDate(w.date).getTime())},${yScale(parseFloat(w.kg))}`).join(' L ')} L ${xScale(parseDate(weights[weights.length-1].date).getTime())},${H-P} Z`;
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.5"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${H-P}" class="chart-grid"/>
+    <line x1="${P}" y1="${P}" x2="${P}" y2="${H-P}" class="chart-grid"/>
+    <path d="${areaPath}" class="chart-area"/>
+    <polyline points="${points}" class="chart-line"/>
+    ${weights.map(w => `<circle cx="${xScale(parseDate(w.date).getTime())}" cy="${yScale(parseFloat(w.kg))}" r="3.5" class="chart-dot chart-dot-stroke"/>`).join('')}
+    <text x="${P-4}" y="${P+4}" class="chart-label" text-anchor="end">${yMax.toFixed(1)}</text>
+    <text x="${P-4}" y="${H-P+4}" class="chart-label" text-anchor="end">${yMin.toFixed(1)}</text>
+    <text x="${P}" y="${H-8}" class="chart-label">${fmtDateShort(weights[0].date)}</text>
+    <text x="${W-P}" y="${H-8}" class="chart-label" text-anchor="end">${fmtDateShort(weights[weights.length-1].date)}</text>
+  </svg>`;
+}
+function renderTestsTab() {
+  const tests = [...STATE.data.tests].sort((a,b) => b.date.localeCompare(a.date));
+  const allParams = {};
+  tests.forEach(t => Object.keys(t.params || {}).forEach(p => allParams[p] = (allParams[p]||0)+1));
+  const topParams = Object.entries(allParams).sort((a,b)=>b[1]-a[1]).slice(0,4).map(e=>e[0]);
+  return `<button class="btn-add" onclick="openTestModal()">+ Tahlil Sonucu Ekle</button>
+    ${topParams.length > 0 && tests.length >= 2 ? `<div class="card"><div class="card-title"><span>Parametre Trendi</span></div>
+      <div style="margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap;" id="paramSelector">
+        ${topParams.map((p, i) => `<button class="mood-tag ${i===0?'active':''}" data-param="${escapeHtml(p)}" onclick="selectTestParam(this)">${escapeHtml(p)}</button>`).join('')}
+      </div><div id="testChart">${renderTestChart(topParams[0], tests)}</div></div>` : ''}
+    ${tests.length === 0 ? `<div class="empty-state"><div class="emoji">🧪</div><div class="text">Henüz tahlil sonucu yok</div></div>` :
+      tests.map(t => `<div class="card">
+        <div class="card-title"><span>${fmtDate(t.date)}</span><span class="action" onclick="deleteTest('${t.date}', ${tests.indexOf(t)})">Sil</span></div>
+        ${Object.keys(t.params||{}).length > 0 ? Object.entries(t.params).map(([k,v]) => `<div class="test-row">
+          <div class="test-name">${escapeHtml(k)}</div><div class="test-value">${escapeHtml(String(v))}</div>
+          <div class="test-trend">${getTrend(k, v, tests, t)}</div></div>`).join('') : ''}
+        ${t.notes ? `<div style="font-size: 12px; color: var(--text-dim); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); line-height: 1.5;">${escapeHtml(t.notes)}</div>` : ''}
+        ${t.photo ? `<img src="${t.photo}" style="width: 100%; max-height: 240px; object-fit: contain; border-radius: 10px; margin-top: 10px; background: var(--bg-elev);">` : ''}
+      </div>`).join('')}`;
+}
+function getTrend(paramKey, currentVal, tests, currentTest) {
+  const sorted = [...tests].sort((a,b) => a.date.localeCompare(b.date));
+  const idx = sorted.indexOf(currentTest); if (idx <= 0) return '';
+  const prev = sorted[idx - 1];
+  if (!prev.params || prev.params[paramKey] === undefined) return '';
+  const prevVal = parseFloat(prev.params[paramKey]); const curVal = parseFloat(currentVal);
+  if (isNaN(prevVal) || isNaN(curVal)) return '';
+  const diff = curVal - prevVal;
+  if (Math.abs(diff) < 0.001) return '—';
+  return `<span class="${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '↑' : '↓'} ${Math.abs(diff).toFixed(2)}</span>`;
+}
+function selectTestParam(btn) {
+  document.querySelectorAll('#paramSelector .mood-tag').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const tests = [...STATE.data.tests].sort((a,b) => b.date.localeCompare(a.date));
+  document.getElementById('testChart').innerHTML = renderTestChart(btn.dataset.param, tests);
+}
+function renderTestChart(paramName, tests) {
+  const data = tests.filter(t => t.params && t.params[paramName] !== undefined && !isNaN(parseFloat(t.params[paramName])))
+    .map(t => ({ date: t.date, val: parseFloat(t.params[paramName]) })).sort((a,b) => a.date.localeCompare(b.date));
+  if (data.length < 2) return `<div class="empty-state"><div class="text">En az 2 ölçüm gerekli</div></div>`;
+  const W=320, H=160, P=30;
+  const xs = data.map(d => parseDate(d.date).getTime());
+  const ys = data.map(d => d.val);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const padY = (maxY - minY) * 0.2 || maxY * 0.1 || 1;
+  const yMin = minY - padY, yMax = maxY + padY;
+  const xScale = x => P + ((x - minX) / (maxX - minX || 1)) * (W - 2*P);
+  const yScale = y => H - P - ((y - yMin) / (yMax - yMin || 1)) * (H - 2*P);
+  const points = data.map(d => `${xScale(parseDate(d.date).getTime())},${yScale(d.val)}`).join(' ');
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}">
+    <line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${H-P}" class="chart-grid"/>
+    <line x1="${P}" y1="${P}" x2="${P}" y2="${H-P}" class="chart-grid"/>
+    <polyline points="${points}" class="chart-line"/>
+    ${data.map(d => `<circle cx="${xScale(parseDate(d.date).getTime())}" cy="${yScale(d.val)}" r="3.5" class="chart-dot chart-dot-stroke"/>`).join('')}
+    <text x="${P-4}" y="${P+4}" class="chart-label" text-anchor="end">${yMax.toFixed(1)}</text>
+    <text x="${P-4}" y="${H-P+4}" class="chart-label" text-anchor="end">${yMin.toFixed(1)}</text>
+    <text x="${P}" y="${H-8}" class="chart-label">${fmtDateShort(data[0].date)}</text>
+    <text x="${W-P}" y="${H-8}" class="chart-label" text-anchor="end">${fmtDateShort(data[data.length-1].date)}</text>
+  </svg>`;
+}
+function renderVaccTab() {
+  const v = [...STATE.data.vaccines].sort((a,b) => b.date.localeCompare(a.date));
+  return `<button class="btn-add" onclick="openVaccineModal()">+ Aşı Kaydı Ekle</button>
+    ${v.length === 0 ? `<div class="empty-state"><div class="emoji">💉</div><div class="text">Henüz aşı kaydı yok</div></div>` :
+      `<div class="card">${v.map(vc => {
+        const today = new Date();
+        const next = vc.nextDate ? parseDate(vc.nextDate) : null;
+        const daysUntil = next ? Math.ceil((next - today) / 86400000) : null;
+        return `<div class="timeline-item">
+          <div class="timeline-dot">💉</div>
+          <div class="timeline-content">
+            <div class="timeline-date">${fmtDate(vc.date)}</div>
+            <div class="timeline-title">${escapeHtml(vc.name)} <span style="margin-left:8px;color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="deleteVaccine('${vc.id}')">sil</span></div>
+            ${vc.nextDate ? `<div class="timeline-desc">Bir sonraki: ${fmtDate(vc.nextDate)} ${daysUntil !== null ? `<span class="${daysUntil < 0 ? 'text-danger' : daysUntil <= 30 ? 'text-warning' : 'text-dim'}">(${daysUntil < 0 ? Math.abs(daysUntil)+' gün gecikti' : daysUntil+' gün kaldı'})</span>` : ''}</div>` : ''}
+            ${vc.notes ? `<div class="timeline-desc" style="margin-top: 4px;">${escapeHtml(vc.notes)}</div>` : ''}
+          </div></div>`;
+      }).join('')}</div>`}`;
+}
+function renderHistoryTab() {
+  const h = [...STATE.data.history].sort((a,b) => b.date.localeCompare(a.date));
+  return `<button class="btn-add" onclick="openHistoryModal()">+ Hastalık / Olay Ekle</button>
+    <div class="card"><div class="card-title"><span>Kronik Durumlar</span><span class="action" onclick="openConditionsModal()">Düzenle ›</span></div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        ${(STATE.data.profile.conditions||[]).length === 0 ? '<span class="text-faint" style="font-size: 12px;">Tanımlanmadı</span>' :
+          (STATE.data.profile.conditions||[]).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('')}
+      </div></div>
+    ${h.length === 0 ? `<div class="empty-state"><div class="emoji">🏥</div><div class="text">Henüz hastalık/olay kaydı yok</div></div>` :
+      `<div class="card">${h.map(item => `<div class="timeline-item">
+        <div class="timeline-dot">🏥</div>
+        <div class="timeline-content">
+          <div class="timeline-date">${fmtDate(item.date)}</div>
+          <div class="timeline-title">${escapeHtml(item.title)} <span style="margin-left:8px;color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="deleteHistory('${item.id}')">sil</span></div>
+          ${item.description ? `<div class="timeline-desc">${escapeHtml(item.description)}</div>` : ''}
+        </div></div>`).join('')}</div>`}`;
+}
+document.querySelectorAll('#healthSegment .segment-item').forEach(seg => {
+  seg.addEventListener('click', () => {
+    document.querySelectorAll('#healthSegment .segment-item').forEach(s => s.classList.remove('active'));
+    seg.classList.add('active'); STATE.view.healthFilter = seg.dataset.tab; renderHealth();
+  });
+});
+
+function renderCalendar() {
+  const tab = STATE.view.calFilter;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let events = [...STATE.data.events];
+  if (tab === 'upcoming') { events = events.filter(e => parseDate(e.date) >= today && !e.done); events.sort((a,b) => a.date.localeCompare(b.date)); }
+  else { events = events.filter(e => parseDate(e.date) < today || e.done); events.sort((a,b) => b.date.localeCompare(a.date)); }
+  const c = document.getElementById('calendarList');
+  if (events.length === 0) { c.innerHTML = `<div class="empty-state"><div class="emoji">📅</div><div class="text">${tab==='upcoming'?'Yaklaşan etkinlik yok':'Geçmiş etkinlik yok'}</div>${tab==='upcoming'?'<button class="btn btn-primary" style="margin-top: 16px;" onclick="openEventModal()">Etkinlik Ekle</button>':''}</div>`; return; }
+  const icons = {vet:'🏥', vaccine:'💉', parasite:'🐛', grooming:'✂️', other:'📌'};
+  const labels = {vet:'Veteriner', vaccine:'Aşı', parasite:'Parazit', grooming:'Tımar', other:'Diğer'};
+  c.innerHTML = `<div class="card">${events.map(e => {
+    const d = parseDate(e.date);
+    const daysUntil = Math.ceil((d - today) / 86400000);
+    let metaText = tab === 'upcoming'
+      ? `${fmtDate(e.date)} • ${daysUntil === 0 ? 'Bugün' : daysUntil === 1 ? 'Yarın' : daysUntil + ' gün sonra'}${e.time?' • '+e.time:''}`
+      : fmtDate(e.date) + (e.time?' • '+e.time:'') + (e.done?' • ✓ Tamamlandı':'');
+    return `<div class="timeline-item">
+      <div class="timeline-dot">${icons[e.type]||'📌'}</div>
+      <div class="timeline-content">
+        <div class="timeline-date">${labels[e.type]||'Etkinlik'}</div>
+        <div class="timeline-title">${escapeHtml(e.title)}
+          <span style="margin-left:8px;color:var(--text-faint);font-size:11px;cursor:pointer;" onclick="openEventModal('${e.id}')">düzenle</span>
+          ${tab==='upcoming' ? `<span style="margin-left:8px;color:var(--success);font-size:11px;cursor:pointer;" onclick="markEventDone('${e.id}')">✓</span>` : ''}
+          <span style="margin-left:8px;color:var(--danger);font-size:11px;cursor:pointer;" onclick="deleteEvent('${e.id}')">sil</span>
+        </div>
+        <div class="timeline-desc">${metaText}</div>
+        ${e.notes ? `<div class="timeline-desc" style="margin-top: 4px;">${escapeHtml(e.notes)}</div>` : ''}
+      </div></div>`;
+  }).join('')}</div>`;
+}
+document.querySelectorAll('#calSegment .segment-item').forEach(seg => {
+  seg.addEventListener('click', () => {
+    document.querySelectorAll('#calSegment .segment-item').forEach(s => s.classList.remove('active'));
+    seg.classList.add('active'); STATE.view.calFilter = seg.dataset.tab; renderCalendar();
+  });
+});
+
+// ============================================================
+// MUTATIONS
+// ============================================================
+function toggleMedDose(medId, time) {
+  const today = todayKey();
+  if (!STATE.data.medLogs[today]) STATE.data.medLogs[today] = {};
+  if (!STATE.data.medLogs[today][medId]) STATE.data.medLogs[today][medId] = {};
+  const log = STATE.data.medLogs[today][medId];
+  const med = STATE.data.meds.find(m => m.id === medId);
+  if (log[time]) {
+    delete log[time];
+    if (med && med.stock) med.stock = (parseFloat(med.stock) + parseFloat(med.perDose||1)).toString();
+  } else {
+    log[time] = Date.now();
+    if (med && med.stock) med.stock = Math.max(0, parseFloat(med.stock) - parseFloat(med.perDose||1)).toString();
+  }
+  queueSave(); renderHome();
+  if (STATE.view.currentScreen === 'meds') renderMeds();
+}
+function setMealLog(foodId, value) {
+  const today = todayKey();
+  if (!STATE.data.mealLogs[today]) STATE.data.mealLogs[today] = {};
+  if (STATE.data.mealLogs[today][foodId] === value) delete STATE.data.mealLogs[today][foodId];
+  else STATE.data.mealLogs[today][foodId] = value;
+  queueSave(); renderHome();
+  if (STATE.view.currentScreen === 'meals') renderMeals();
+}
+function addWater(ml) {
+  const today = todayKey();
+  STATE.data.waterLogs[today] = (STATE.data.waterLogs[today] || 0) + ml;
+  queueSave(); renderHome();
+  if (STATE.view.currentScreen === 'meals') renderMeals();
+}
+function resetWater() {
+  if (!confirm('Bugünün su kaydını sıfırla?')) return;
+  STATE.data.waterLogs[todayKey()] = 0;
+  queueSave(); renderHome();
+  if (STATE.view.currentScreen === 'meals') renderMeals();
+}
+function callVet(e) {
+  e.preventDefault();
+  const phone = STATE.data.profile.vetPhone;
+  if (!phone) { openSettings(); return; }
+  window.location.href = 'tel:' + phone.replace(/\s/g,'');
+}
+document.getElementById('moodTags').addEventListener('click', e => {
+  const tag = e.target.closest('.mood-tag'); if (!tag) return;
+  const today = todayKey();
+  if (!STATE.data.moods[today]) STATE.data.moods[today] = { tags: [], note: '' };
+  const tags = STATE.data.moods[today].tags;
+  const mood = tag.dataset.mood;
+  const idx = tags.indexOf(mood);
+  if (idx >= 0) tags.splice(idx, 1); else tags.push(mood);
+  tag.classList.toggle('active');
+  queueSave();
+});
+let noteDebounce = null;
+document.getElementById('dailyNote').addEventListener('input', e => {
+  const today = todayKey();
+  if (!STATE.data.moods[today]) STATE.data.moods[today] = { tags: [], note: '' };
+  STATE.data.moods[today].note = e.target.value;
+  clearTimeout(noteDebounce); noteDebounce = setTimeout(queueSave, 600);
+});
+document.getElementById('photoInput').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 3MB)', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxDim = 400;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+      else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      STATE.data.profile.photo = canvas.toDataURL('image/jpeg', 0.85);
+      queueSave(); renderHome();
+      toast('Fotoğraf kaydedildi', 'success');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// ============================================================
+// MODALS
+// ============================================================
+function openMedModal(id) {
+  const m = id ? STATE.data.meds.find(x => x.id === id) : null;
+  const med = m || { id: '', name:'', dose:'', perDose:'1', doseUnit:'tablet', times:[], stock:'', stockUnit:'tablet', condition:'', notes:'', active: true };
+  openModal(`<div class="modal-title">${m ? 'İlacı Düzenle' : 'Yeni İlaç'}</div>
+    <div class="modal-subtitle">${m ? m.name : 'İlaç bilgilerini gir'}</div>
+    <div class="field"><label class="field-label">İlaç Adı *</label><input class="field-input" id="mName" value="${escapeHtml(med.name)}" placeholder="ör: Furosemid"></div>
+    <div class="field"><label class="field-label">Doz Açıklaması</label><input class="field-input" id="mDose" value="${escapeHtml(med.dose)}" placeholder="ör: 1/4 tablet, 0.2 ml"></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Doz Başına</label><input class="field-input" id="mPerDose" type="number" step="0.01" value="${escapeHtml(med.perDose)}" placeholder="1"></div>
+      <div class="field"><label class="field-label">Birim</label><input class="field-input" id="mDoseUnit" value="${escapeHtml(med.doseUnit||'tablet')}" placeholder="tablet, ml, mg"></div>
+    </div>
+    <div class="field"><label class="field-label">Saatler</label>
+      <div class="times-input" id="mTimes">${(med.times||[]).map(t => `<span class="time-chip">${t}<span class="x" onclick="removeTime(this)">×</span></span>`).join('')}</div>
+      <div class="time-input-wrap" style="margin-top: 8px;"><input id="mNewTime" type="time" placeholder="08:00"><button class="btn btn-secondary" onclick="addTimeChip()">Saat Ekle</button></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Stok</label><input class="field-input" id="mStock" type="number" step="0.01" value="${escapeHtml(med.stock)}" placeholder="ör: 30"></div>
+      <div class="field"><label class="field-label">Stok Birimi</label><input class="field-input" id="mStockUnit" value="${escapeHtml(med.stockUnit||'tablet')}" placeholder="tablet, ml"></div>
+    </div>
+    <div class="field"><label class="field-label">Hastalık / Etiket</label><input class="field-input" id="mCondition" value="${escapeHtml(med.condition)}" placeholder="ör: HCM, Böbrek"></div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="mNotes" placeholder="ör: Aç karnına, yemekle birlikte">${escapeHtml(med.notes)}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      ${m ? `<button class="btn btn-secondary" onclick="deleteMed('${m.id}')" style="color: var(--danger);">Sil</button>` : ''}
+      <button class="btn btn-primary" onclick="saveMed('${m ? m.id : ''}')">Kaydet</button>
+    </div>`);
+}
+function addTimeChip() {
+  const inp = document.getElementById('mNewTime');
+  const t = inp.value; if (!t) return;
+  const container = document.getElementById('mTimes');
+  const existing = Array.from(container.querySelectorAll('.time-chip')).map(c => c.firstChild.textContent);
+  if (existing.includes(t)) { toast('Bu saat zaten eklendi'); return; }
+  const chip = document.createElement('span');
+  chip.className = 'time-chip';
+  chip.innerHTML = `${t}<span class="x" onclick="removeTime(this)">×</span>`;
+  container.appendChild(chip); inp.value = '';
+}
+function removeTime(x) { x.parentElement.remove(); }
+function saveMed(id) {
+  const name = document.getElementById('mName').value.trim();
+  if (!name) { toast('İlaç adı gerekli', 'error'); return; }
+  const times = Array.from(document.querySelectorAll('#mTimes .time-chip')).map(c => c.firstChild.textContent).sort();
+  const data = { id: id || uid(), name, dose: document.getElementById('mDose').value.trim(),
+    perDose: document.getElementById('mPerDose').value, doseUnit: document.getElementById('mDoseUnit').value.trim(),
+    times, stock: document.getElementById('mStock').value, stockUnit: document.getElementById('mStockUnit').value.trim(),
+    condition: document.getElementById('mCondition').value.trim(), notes: document.getElementById('mNotes').value.trim(), active: true };
+  if (id) { const idx = STATE.data.meds.findIndex(m => m.id === id); data.active = STATE.data.meds[idx].active; STATE.data.meds[idx] = data; }
+  else STATE.data.meds.push(data);
+  queueSave(); scheduleNotifications(); closeModal(); renderAll();
+  toast(id ? 'İlaç güncellendi' : 'İlaç eklendi', 'success');
+}
+function deleteMed(id) {
+  if (!confirm('Bu ilacı tamamen silmek istiyor musun?')) return;
+  STATE.data.meds = STATE.data.meds.filter(m => m.id !== id);
+  queueSave(); scheduleNotifications(); closeModal(); renderAll(); toast('İlaç silindi');
+}
+function toggleMedActive(id) {
+  const m = STATE.data.meds.find(x => x.id === id); if (!m) return;
+  m.active = !m.active;
+  queueSave(); scheduleNotifications(); renderAll();
+  toast(m.active ? 'İlaç aktifleştirildi' : 'İlaç arşivlendi');
+}
+function adjustStock(id) {
+  const m = STATE.data.meds.find(x => x.id === id); if (!m) return;
+  const v = prompt(`${m.name} • Yeni stok (${m.stockUnit||''}):`, m.stock);
+  if (v === null) return;
+  const num = parseFloat(v);
+  if (isNaN(num)) { toast('Geçersiz değer', 'error'); return; }
+  m.stock = num.toString(); queueSave(); renderAll(); toast('Stok güncellendi');
+}
+
+function openMealModal(id) {
+  const f = id ? STATE.data.foods.find(x => x.id === id) : null;
+  const food = f || { id:'', time:'08:00', name:'', amount:'', notes:'' };
+  openModal(`<div class="modal-title">${f ? 'Öğünü Düzenle' : 'Yeni Öğün'}</div>
+    <div class="modal-subtitle">Günlük öğün planı</div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Saat</label><input class="field-input" id="fTime" type="time" value="${escapeHtml(food.time)}"></div>
+      <div class="field"><label class="field-label">Miktar</label><input class="field-input" id="fAmount" value="${escapeHtml(food.amount)}" placeholder="ör: 30g, 1/2 kutu"></div>
+    </div>
+    <div class="field"><label class="field-label">Öğün Adı *</label><input class="field-input" id="fName" value="${escapeHtml(food.name)}" placeholder="ör: Sabah maması"></div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="fNotes" placeholder="ör: ısıt, su ekle">${escapeHtml(food.notes)}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      ${f ? `<button class="btn btn-secondary" onclick="deleteFood('${f.id}')" style="color: var(--danger);">Sil</button>` : ''}
+      <button class="btn btn-primary" onclick="saveFood('${f ? f.id : ''}')">Kaydet</button>
+    </div>`);
+}
+function saveFood(id) {
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { toast('Öğün adı gerekli', 'error'); return; }
+  const data = { id: id || uid(), time: document.getElementById('fTime').value, name,
+    amount: document.getElementById('fAmount').value.trim(), notes: document.getElementById('fNotes').value.trim() };
+  if (id) { const idx = STATE.data.foods.findIndex(f => f.id === id); STATE.data.foods[idx] = data; }
+  else STATE.data.foods.push(data);
+  queueSave(); scheduleNotifications(); closeModal(); renderAll();
+  toast(id ? 'Öğün güncellendi' : 'Öğün eklendi', 'success');
+}
+function deleteFood(id) {
+  if (!confirm('Bu öğünü silmek istiyor musun?')) return;
+  STATE.data.foods = STATE.data.foods.filter(f => f.id !== id);
+  queueSave(); scheduleNotifications(); closeModal(); renderAll(); toast('Öğün silindi');
+}
+function openFoodInfoModal() {
+  const fi = STATE.data.foodInfo;
+  openModal(`<div class="modal-title">Mama Bilgileri</div>
+    <div class="modal-subtitle">Hangi mamayı kullanıyorsun?</div>
+    <div class="field"><label class="field-label">Marka</label><input class="field-input" id="fiBrand" value="${escapeHtml(fi.brand)}" placeholder="ör: Royal Canin"></div>
+    <div class="field"><label class="field-label">Tip</label><input class="field-input" id="fiType" value="${escapeHtml(fi.type)}" placeholder="ör: Renal, Hepatic"></div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="fiNotes" placeholder="ör: Veteriner önerdi">${escapeHtml(fi.notes)}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      <button class="btn btn-primary" onclick="saveFoodInfo()">Kaydet</button>
+    </div>`);
+}
+function saveFoodInfo() {
+  STATE.data.foodInfo = { brand: document.getElementById('fiBrand').value.trim(),
+    type: document.getElementById('fiType').value.trim(), notes: document.getElementById('fiNotes').value.trim() };
+  queueSave(); closeModal(); renderMeals(); toast('Mama bilgisi kaydedildi', 'success');
+}
+
+function openWeightModal() {
+  openModal(`<div class="modal-title">Kilo Kaydı</div>
+    <div class="modal-subtitle">Yeni ölçüm ekle</div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Tarih</label><input class="field-input" id="wDate" type="date" value="${todayKey()}"></div>
+      <div class="field"><label class="field-label">Kilo (kg)</label><input class="field-input" id="wKg" type="number" step="0.01" placeholder="ör: 4.20"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveWeight()">Kaydet</button></div>`);
+}
+function saveWeight() {
+  const date = document.getElementById('wDate').value;
+  const kg = document.getElementById('wKg').value;
+  if (!date || !kg) { toast('Tarih ve kilo gerekli', 'error'); return; }
+  STATE.data.weights = STATE.data.weights.filter(w => w.date !== date);
+  STATE.data.weights.push({ date, kg: parseFloat(kg).toString() });
+  queueSave(); closeModal(); renderAll(); toast('Kilo kaydedildi', 'success');
+}
+function deleteWeight(date, kg) {
+  if (!confirm(`${fmtDate(date)} • ${kg} kg kaydını sil?`)) return;
+  STATE.data.weights = STATE.data.weights.filter(w => w.date !== date);
+  queueSave(); renderHealth(); toast('Silindi');
+}
+
+function openTestModal() {
+  const commonParams = ['Kreatinin', 'BUN/Üre', 'ALT/SGPT', 'AST/SGOT', 'SDMA', 'Fosfor', 'Potasyum', 'Toplam Protein', 'Hemoglobin', 'Hematokrit'];
+  openModal(`<div class="modal-title">Tahlil Sonucu</div>
+    <div class="modal-subtitle">Değerleri ve dosyayı ekle</div>
+    <div class="field"><label class="field-label">Tarih</label><input class="field-input" id="tDate" type="date" value="${todayKey()}"></div>
+    <div class="field"><label class="field-label">Parametreler</label>
+      <div id="paramRows"></div>
+      <div class="time-input-wrap" style="margin-top: 8px;">
+        <input class="field-input" id="tParamName" placeholder="Parametre adı" style="flex: 2;">
+        <input class="field-input" id="tParamValue" placeholder="Değer" style="flex: 1;">
+        <button class="btn btn-secondary" onclick="addTestParam()">+</button>
+      </div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+        ${commonParams.map(p => `<button class="mood-tag" onclick="quickAddParam('${p}')">${p}</button>`).join('')}
+      </div></div>
+    <div class="field"><label class="field-label">Tahlil Fotoğrafı (Opsiyonel)</label><input class="field-input" id="tPhoto" type="file" accept="image/*" style="padding: 8px;"></div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="tNotes" placeholder="Veteriner yorumu, semptomlar..."></textarea></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveTest()">Kaydet</button></div>`);
+}
+function addTestParam() {
+  const name = document.getElementById('tParamName').value.trim();
+  const value = document.getElementById('tParamValue').value.trim();
+  if (!name || !value) return;
+  const container = document.getElementById('paramRows');
+  const row = document.createElement('div');
+  row.className = 'test-row'; row.dataset.name = name; row.dataset.value = value;
+  row.innerHTML = `<div class="test-name">${escapeHtml(name)}</div><div class="test-value">${escapeHtml(value)}</div><div class="test-trend"><span style="cursor: pointer; color: var(--danger);" onclick="this.closest('.test-row').remove()">×</span></div>`;
+  container.appendChild(row);
+  document.getElementById('tParamName').value = '';
+  document.getElementById('tParamValue').value = '';
+}
+function quickAddParam(name) { document.getElementById('tParamName').value = name; document.getElementById('tParamValue').focus(); }
+async function saveTest() {
+  const date = document.getElementById('tDate').value;
+  if (!date) { toast('Tarih gerekli', 'error'); return; }
+  const params = {};
+  document.querySelectorAll('#paramRows .test-row').forEach(r => params[r.dataset.name] = r.dataset.value);
+  const pName = document.getElementById('tParamName').value.trim();
+  const pVal = document.getElementById('tParamValue').value.trim();
+  if (pName && pVal) params[pName] = pVal;
+  const photoFile = document.getElementById('tPhoto').files[0];
+  let photo = null;
+  if (photoFile) {
+    if (photoFile.size > 3 * 1024 * 1024) { toast('Fotoğraf çok büyük (max 3MB)', 'error'); return; }
+    photo = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1000;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+          else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(photoFile);
+    });
+  }
+  STATE.data.tests.push({ date, params, photo, notes: document.getElementById('tNotes').value.trim() });
+  queueSave(); closeModal(); renderHealth(); toast('Tahlil kaydedildi', 'success');
+}
+function deleteTest(date, idx) {
+  if (!confirm('Bu tahlil sonucunu sil?')) return;
+  const sorted = [...STATE.data.tests].sort((a,b) => b.date.localeCompare(a.date));
+  const target = sorted[idx];
+  STATE.data.tests = STATE.data.tests.filter(t => t !== target);
+  queueSave(); renderHealth(); toast('Silindi');
+}
+
+function openVaccineModal() {
+  openModal(`<div class="modal-title">Aşı Kaydı</div><div class="modal-subtitle">Yapılan aşı bilgisi</div>
+    <div class="field"><label class="field-label">Aşı Adı *</label><input class="field-input" id="vName" placeholder="ör: Karma, Kuduz"></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Yapıldığı Tarih</label><input class="field-input" id="vDate" type="date" value="${todayKey()}"></div>
+      <div class="field"><label class="field-label">Sonraki Tarih</label><input class="field-input" id="vNext" type="date"></div>
+    </div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="vNotes" placeholder="Veteriner, parti no, vb."></textarea></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveVaccine()">Kaydet</button></div>`);
+}
+function saveVaccine() {
+  const name = document.getElementById('vName').value.trim();
+  if (!name) { toast('Aşı adı gerekli', 'error'); return; }
+  STATE.data.vaccines.push({ id: uid(), name, date: document.getElementById('vDate').value,
+    nextDate: document.getElementById('vNext').value || null, notes: document.getElementById('vNotes').value.trim() });
+  queueSave(); closeModal(); renderHealth(); toast('Aşı kaydedildi', 'success');
+}
+function deleteVaccine(id) {
+  if (!confirm('Bu aşı kaydını sil?')) return;
+  STATE.data.vaccines = STATE.data.vaccines.filter(v => v.id !== id);
+  queueSave(); renderHealth(); toast('Silindi');
+}
+
+function openHistoryModal() {
+  openModal(`<div class="modal-title">Hastalık / Olay</div><div class="modal-subtitle">Sağlık geçmişine ekle</div>
+    <div class="field"><label class="field-label">Tarih</label><input class="field-input" id="hDate" type="date" value="${todayKey()}"></div>
+    <div class="field"><label class="field-label">Başlık *</label><input class="field-input" id="hTitle" placeholder="ör: HCM teşhisi, Kontrol"></div>
+    <div class="field"><label class="field-label">Açıklama</label><textarea class="field-input" id="hDesc" placeholder="Detaylar, semptomlar, tedavi..." style="min-height: 100px;"></textarea></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveHistory()">Kaydet</button></div>`);
+}
+function saveHistory() {
+  const title = document.getElementById('hTitle').value.trim();
+  if (!title) { toast('Başlık gerekli', 'error'); return; }
+  STATE.data.history.push({ id: uid(), date: document.getElementById('hDate').value, title, description: document.getElementById('hDesc').value.trim() });
+  queueSave(); closeModal(); renderHealth(); toast('Kayıt eklendi', 'success');
+}
+function deleteHistory(id) {
+  if (!confirm('Bu kaydı sil?')) return;
+  STATE.data.history = STATE.data.history.filter(h => h.id !== id);
+  queueSave(); renderHealth(); toast('Silindi');
+}
+
+function openConditionsModal() {
+  openModal(`<div class="modal-title">Kronik Durumlar</div><div class="modal-subtitle">Bihter'in sağlık durumları</div>
+    <div class="field"><label class="field-label">Durumlar (her satıra bir tane)</label>
+      <textarea class="field-input" id="condList" style="min-height: 120px;">${(STATE.data.profile.conditions||[]).join('\n')}</textarea></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">İptal</button><button class="btn btn-primary" onclick="saveConditions()">Kaydet</button></div>`);
+}
+function saveConditions() {
+  STATE.data.profile.conditions = document.getElementById('condList').value.split('\n').map(s => s.trim()).filter(Boolean);
+  queueSave(); closeModal(); renderAll(); toast('Güncellendi', 'success');
+}
+
+function openEventModal(id) {
+  const e = id ? STATE.data.events.find(x => x.id === id) : null;
+  const ev = e || { id:'', title:'', date: todayKey(), time:'', type:'vet', notes:'', done: false };
+  openModal(`<div class="modal-title">${e ? 'Etkinliği Düzenle' : 'Yeni Etkinlik'}</div>
+    <div class="modal-subtitle">Takvime ekle</div>
+    <div class="field"><label class="field-label">Tip</label>
+      <select class="field-input" id="eType">
+        <option value="vet" ${ev.type==='vet'?'selected':''}>🏥 Veteriner Randevusu</option>
+        <option value="vaccine" ${ev.type==='vaccine'?'selected':''}>💉 Aşı</option>
+        <option value="parasite" ${ev.type==='parasite'?'selected':''}>🐛 Parazit İlacı</option>
+        <option value="grooming" ${ev.type==='grooming'?'selected':''}>✂️ Tımar / Bakım</option>
+        <option value="other" ${ev.type==='other'?'selected':''}>📌 Diğer</option>
+      </select></div>
+    <div class="field"><label class="field-label">Başlık *</label><input class="field-input" id="eTitle" value="${escapeHtml(ev.title)}" placeholder="ör: Kontrol, Kan tahlili"></div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">Tarih</label><input class="field-input" id="eDate" type="date" value="${ev.date}"></div>
+      <div class="field"><label class="field-label">Saat</label><input class="field-input" id="eTime" type="time" value="${ev.time||''}"></div>
+    </div>
+    <div class="field"><label class="field-label">Notlar</label><textarea class="field-input" id="eNotes" placeholder="Ek bilgiler...">${escapeHtml(ev.notes)}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">İptal</button>
+      ${e ? `<button class="btn btn-secondary" onclick="deleteEvent('${e.id}', true)" style="color: var(--danger);">Sil</button>` : ''}
+      <button class="btn btn-primary" onclick="saveEvent('${e ? e.id : ''}')">Kaydet</button>
+    </div>`);
+}
+function saveEvent(id) {
+  const title = document.getElementById('eTitle').value.trim();
+  if (!title) { toast('Başlık gerekli', 'error'); return; }
+  const data = { id: id || uid(), type: document.getElementById('eType').value, title,
+    date: document.getElementById('eDate').value, time: document.getElementById('eTime').value,
+    notes: document.getElementById('eNotes').value.trim(), done: false };
+  if (id) { const idx = STATE.data.events.findIndex(e => e.id === id); data.done = STATE.data.events[idx].done; STATE.data.events[idx] = data; }
+  else STATE.data.events.push(data);
+  queueSave(); scheduleNotifications(); closeModal(); renderAll();
+  toast(id ? 'Etkinlik güncellendi' : 'Etkinlik eklendi', 'success');
+}
+function deleteEvent(id, fromModal) {
+  if (!confirm('Bu etkinliği sil?')) return;
+  STATE.data.events = STATE.data.events.filter(e => e.id !== id);
+  queueSave(); if (fromModal) closeModal(); renderAll(); toast('Silindi');
+}
+function markEventDone(id) {
+  const e = STATE.data.events.find(x => x.id === id); if (!e) return;
+  e.done = true;
+  STATE.data.history.push({ id: uid(), date: e.date, title: e.title, description: e.notes || '' });
+  if (e.type === 'parasite') STATE.data.parasiteSchedule.lastDate = e.date;
+  queueSave(); renderAll(); toast('Tamamlandı ✓', 'success');
+}
+
+function openSettings() {
+  const p = STATE.data.profile;
+  openModal(`<div class="modal-title">Ayarlar</div><div class="modal-subtitle">Bihter'in ayarları</div>
+    <div class="card-title" style="margin-top: 8px;">Profil</div>
+    <div class="field"><label class="field-label">Adı</label><input class="field-input" id="sName" value="${escapeHtml(p.name)}"></div>
+    <div class="field"><label class="field-label">Doğum Tarihi</label><input class="field-input" id="sBirth" type="date" value="${p.birthDate}"></div>
+    <div class="field"><label class="field-label">Tür</label>
+      <select class="field-input" id="sSpecies"><option value="cat" ${p.species==='cat'?'selected':''}>🐱 Kedi</option><option value="dog" ${p.species==='dog'?'selected':''}>🐶 Köpek</option></select></div>
+    <div class="card-title" style="margin-top: 16px;">Veteriner</div>
+    <div class="field"><label class="field-label">Veteriner Adı</label><input class="field-input" id="sVetName" value="${escapeHtml(p.vetName)}" placeholder="ör: Dr. Ahmet"></div>
+    <div class="field"><label class="field-label">Telefon</label><input class="field-input" id="sVetPhone" value="${escapeHtml(p.vetPhone)}" placeholder="ör: 0532..." type="tel"></div>
+    <div class="field"><label class="field-label">Adres</label><textarea class="field-input" id="sVetAddr" placeholder="Klinik adresi">${escapeHtml(p.vetAddress)}</textarea></div>
+    <div class="card-title" style="margin-top: 16px;">Bildirimler</div>
+    <div class="setting-item" onclick="requestNotificationPermission()">
+      <div class="setting-icon">🔔</div>
+      <div class="setting-info"><div class="setting-label">Tarayıcı Bildirimleri</div><div class="setting-value" id="notifStatus">${getNotifStatusText()}</div></div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="card-title" style="margin-top: 16px;">Hesap</div>
+    <div class="setting-item"><div class="setting-icon">🔐</div><div class="setting-info"><div class="setting-label">Bulut ID</div><div class="setting-value">${escapeHtml(STATE.cloudId||'')}</div></div></div>
+    <div class="setting-item" onclick="exportData()"><div class="setting-icon">📤</div><div class="setting-info"><div class="setting-label">Veriyi Dışa Aktar</div><div class="setting-value">JSON yedek dosyası</div></div><div class="setting-arrow">›</div></div>
+    <div class="setting-item" onclick="logout()"><div class="setting-icon" style="color: var(--danger);">↩</div><div class="setting-info"><div class="setting-label" style="color: var(--danger);">Çıkış Yap</div><div class="setting-value">Bu cihazdan çıkış</div></div></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button><button class="btn btn-primary" onclick="saveSettings()">Kaydet</button></div>`);
+}
+function saveSettings() {
+  STATE.data.profile.name = document.getElementById('sName').value.trim() || 'Bihter';
+  STATE.data.profile.birthDate = document.getElementById('sBirth').value;
+  STATE.data.profile.species = document.getElementById('sSpecies').value;
+  STATE.data.profile.vetName = document.getElementById('sVetName').value.trim();
+  STATE.data.profile.vetPhone = document.getElementById('sVetPhone').value.trim();
+  STATE.data.profile.vetAddress = document.getElementById('sVetAddr').value.trim();
+  queueSave(); closeModal(); renderAll(); toast('Ayarlar kaydedildi', 'success');
+}
+function exportData() {
+  const json = JSON.stringify(STATE.data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `bihter-yedek-${todayKey()}.json`; a.click();
+  URL.revokeObjectURL(url); toast('Yedek indirildi', 'success');
+}
+function getNotifStatusText() {
+  if (!('Notification' in window)) return 'Desteklenmiyor';
+  if (Notification.permission === 'granted') return 'Açık ✓';
+  if (Notification.permission === 'denied') return 'Engellendi (tarayıcı ayarlarından aç)';
+  return 'Henüz açılmadı';
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) { toast('Bu tarayıcı bildirimleri desteklemiyor', 'error'); return; }
+  if (Notification.permission === 'granted') {
+    STATE.data.profile.notificationsEnabled = true; queueSave(); scheduleNotifications();
+    toast('Bildirimler zaten açık ✓', 'success');
+    const s = document.getElementById('notifStatus'); if (s) s.textContent = getNotifStatusText();
+    return;
+  }
+  if (Notification.permission === 'denied') { toast('Tarayıcı ayarlarından bildirim iznini değiştir', 'error'); return; }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    STATE.data.profile.notificationsEnabled = true; queueSave(); scheduleNotifications();
+    toast('Bildirimler açıldı ✓', 'success');
+    new Notification('Bihter Sağlık', { body: 'Bildirimler artık aktif.', icon: 'icon-192.png' });
+  } else { toast('Bildirim izni verilmedi', 'error'); }
+  const s = document.getElementById('notifStatus'); if (s) s.textContent = getNotifStatusText();
+}
+function scheduleNotifications() {
+  STATE.notificationTimers.forEach(t => clearTimeout(t));
+  STATE.notificationTimers = [];
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = new Date();
+  STATE.data.meds.filter(m => m.active).forEach(m => {
+    (m.times||[]).forEach(t => {
+      [0, 1].forEach(dayOffset => {
+        const [h, mi] = t.split(':').map(Number);
+        const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, mi, 0, 0);
+        const delta = d.getTime() - now.getTime();
+        if (delta > 0 && delta < 30 * 60 * 60 * 1000) {
+          const tid = setTimeout(() => {
+            const dayKey = todayKey(d);
+            const log = (STATE.data.medLogs[dayKey] || {})[m.id] || {};
+            if (!log[t]) new Notification('💊 ' + m.name, { body: `${t} • ${m.dose||''}`, icon: 'icon-192.png', tag: 'med-' + m.id + '-' + dayKey + '-' + t, requireInteraction: true });
+          }, delta);
+          STATE.notificationTimers.push(tid);
+        }
+      });
+    });
+  });
+  STATE.data.foods.forEach(f => {
+    if (!f.time) return;
+    [0, 1].forEach(dayOffset => {
+      const [h, mi] = f.time.split(':').map(Number);
+      const d = new Date(); d.setDate(d.getDate() + dayOffset); d.setHours(h, mi, 0, 0);
+      const delta = d.getTime() - now.getTime();
+      if (delta > 0 && delta < 30 * 60 * 60 * 1000) {
+        const tid = setTimeout(() => {
+          const dayKey = todayKey(d);
+          const log = (STATE.data.mealLogs[dayKey] || {})[f.id];
+          if (!log) new Notification('🍽️ ' + f.name, { body: `${f.time} • ${f.amount||''}`, icon: 'icon-192.png', tag: 'meal-' + f.id + '-' + dayKey });
+        }, delta);
+        STATE.notificationTimers.push(tid);
+      }
+    });
+  });
+  STATE.data.events.filter(e => !e.done).forEach(e => {
+    const eDate = parseDate(e.date);
+    if (e.time) { const [h, mi] = e.time.split(':').map(Number); eDate.setHours(h, mi, 0, 0); }
+    else eDate.setHours(9, 0, 0, 0);
+    const reminder = new Date(eDate); reminder.setDate(reminder.getDate() - 1); reminder.setHours(18, 0, 0, 0);
+    const delta = reminder.getTime() - now.getTime();
+    if (delta > 0 && delta < 30 * 60 * 60 * 1000) {
+      const tid = setTimeout(() => new Notification('📅 Yarın: ' + e.title, { body: e.time ? 'Saat ' + e.time : 'Gün boyu', icon: 'icon-192.png', tag: 'event-' + e.id }), delta);
+      STATE.notificationTimers.push(tid);
+    }
+  });
+}
+setInterval(scheduleNotifications, 6 * 60 * 60 * 1000);
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 5, 0);
+  setTimeout(() => { renderAll(); scheduleNotifications(); scheduleMidnightRefresh(); }, tomorrow.getTime() - now.getTime());
+}
+scheduleMidnightRefresh();
+
+// ============================================================
+// AUTO-LOGIN + PWA
+// ============================================================
+window.addEventListener('load', async () => {
+  const sess = localStorage.getItem('bihter_session');
+  if (sess) {
+    try { const { cloudId } = JSON.parse(sess); if (cloudId) { document.getElementById('loginCloudId').value = cloudId; document.getElementById('loginPass').focus(); } } catch(e) {}
+  }
+});
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && STATE.cloudId) { renderAll(); scheduleNotifications(); }
+});
+</script>
+</body>
+</html>
