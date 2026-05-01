@@ -4877,9 +4877,11 @@ function buildJournalTimeline(date) {
     });
   });
 
-  // 2. Meal entries (auto)
+  // 2. Meal entries (auto) — but skip ones that came from a journal entry
+  // (they will be shown via the journal entry below, with full detail)
   const meals = STATE.data.mealEntries[date] || [];
   meals.forEach(e => {
+    if (e.fromJournal) return; // çift gösterme — journal'dan zaten gelecek
     items.push({
       time: e.time,
       type: 'auto-meal',
@@ -4919,7 +4921,7 @@ function buildJournalTimeline(date) {
 
 function getJournalEntryTitle(e) {
   switch(e.type) {
-    case 'meal': return `Mama (manuel)`;
+    case 'meal': return `Mama`;
     case 'water': return `Su`;
     case 'toilet': return `Tuvalet`;
     case 'vomit': return 'Kustu';
