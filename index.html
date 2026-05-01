@@ -5005,12 +5005,8 @@ function computeJournalStats(date) {
   const totalGrams = meals.reduce((s,e) => s + (parseFloat(e.grams)||0), 0);
   const mealCount = meals.length;
 
-  // Water total — from waterLogs (legacy quick buttons) + journal water entries
-  let water = STATE.data.waterLogs[date] || 0;
-  const journalEntries = STATE.data.journal[date] || [];
-  journalEntries.forEach(e => {
-    if (e.type === 'water') water += parseFloat(e.amount) || 0;
-  });
+  // Water total — only from waterLogs (journal water entries already added there as side-effect)
+  const water = STATE.data.waterLogs[date] || 0;
 
   // Mood
   const mood = STATE.data.moods[date] || { tags: [], note: '' };
