@@ -1935,6 +1935,53 @@ textarea.field-input {
   margin-top: 4px;
 }
 
+/* Yeni kompakt özet kartları */
+.vet-report-stat {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elev);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.vet-report-stat-icon {
+  font-size: 22px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.vet-report-stat-content { flex: 1; min-width: 0; }
+.vet-report-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.vet-report-stat-big {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.vet-report-stat-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.vet-report-stat-warn {
+  font-size: 12px;
+  color: var(--warning);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
 /* Tıklanabilir veteriner raporu olayları */
 .vet-report-event {
   display: flex;
@@ -5423,6 +5470,8 @@ function openVetReportModal() {
 
     <div class="field"><label class="field-label">Hızlı Seç</label>
       <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button class="mood-tag" onclick="setVetReportRange(0)">Bugün</button>
+        <button class="mood-tag" onclick="setVetReportRange(3)">Son 3 gün</button>
         <button class="mood-tag" onclick="setVetReportRange(7)">Son 7 gün</button>
         <button class="mood-tag" onclick="setVetReportRange(14)">Son 14 gün</button>
         <button class="mood-tag" onclick="setVetReportRange(30)">Son 30 gün</button>
@@ -5437,8 +5486,11 @@ function openVetReportModal() {
     </div>
 
     <div class="field" style="display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--bg-elev); border-radius: 10px;">
-      <input type="checkbox" id="vrOnlyImportant" style="width: 18px; height: 18px; accent-color: var(--accent);">
-      <label for="vrOnlyImportant" style="font-size: 13px; cursor: pointer; flex: 1;">Sadece dikkat çekici olayları göster</label>
+      <input type="checkbox" id="vrShowAll" style="width: 18px; height: 18px; accent-color: var(--accent);">
+      <label for="vrShowAll" style="font-size: 13px; cursor: pointer; flex: 1;">Rutin olayları da göster (her su/mama girişi)</label>
+    </div>
+    <div style="font-size: 11px; color: var(--text-faint); margin-top: 6px; padding: 0 4px; line-height: 1.5;">
+      Varsayılan: Sadece <b>anormal/dikkat çekici</b> olaylar listelenir. Mama, su, ilaç gibi rutin veriler özet olarak gösterilir.
     </div>
 
     <div class="modal-actions">
@@ -5448,6 +5500,12 @@ function openVetReportModal() {
 }
 
 function setVetReportRange(days) {
+  if (days === 0) {
+    // Bugün: start = end = today
+    document.getElementById('vrStart').value = todayKey();
+    document.getElementById('vrEnd').value = todayKey();
+    return;
+  }
   const d = new Date(); d.setDate(d.getDate() - days);
   document.getElementById('vrStart').value = todayKey(d);
   document.getElementById('vrEnd').value = todayKey();
@@ -5456,18 +5514,27 @@ function setVetReportRange(days) {
 function generateVetReport() {
   const start = document.getElementById('vrStart').value;
   const end = document.getElementById('vrEnd').value;
-  const onlyImportant = document.getElementById('vrOnlyImportant').checked;
+  const showAll = document.getElementById('vrShowAll').checked;
   if (!start || !end) { toast('Tarih aralığı seç', 'error'); return; }
 
   const startD = parseDate(start);
   const endD = parseDate(end);
   const days = Math.round((endD - startD) / 86400000) + 1;
 
+  // Hangi tipler "rutin" sayılır (gizlenecekler showAll false ise ve important değilse)
+  const ROUTINE_TYPES = ['meal', 'water'];
+
   let totalDoses = 0, takenDoses = 0;
   let totalGrams = 0;
+  let totalWater = 0;
   let mealDays = 0;
+  let waterDays = 0;
   const events = [];
   const moods = {};
+  const dailyGrams = []; // [{date, grams}] for trend analysis
+  const dailyWater = []; // [{date, ml}]
+  let minDayGrams = null; // {date, grams}
+  let maxDayGrams = null;
 
   for (let i = 0; i < days; i++) {
     const d = new Date(startD); d.setDate(d.getDate() + i);
@@ -5484,11 +5551,25 @@ function generateVetReport() {
 
     const meals = STATE.data.mealEntries[dKey] || [];
     if (meals.length > 0) mealDays++;
-    totalGrams += meals.reduce((s,e) => s + (parseFloat(e.grams)||0), 0);
+    const dayGrams = meals.reduce((s,e) => s + (parseFloat(e.grams)||0), 0);
+    totalGrams += dayGrams;
+    if (dayGrams > 0) {
+      dailyGrams.push({ date: dKey, grams: dayGrams });
+      if (minDayGrams === null || dayGrams < minDayGrams.grams) minDayGrams = { date: dKey, grams: dayGrams };
+      if (maxDayGrams === null || dayGrams > maxDayGrams.grams) maxDayGrams = { date: dKey, grams: dayGrams };
+    }
+
+    const dayWater = STATE.data.waterLogs[dKey] || 0;
+    totalWater += dayWater;
+    if (dayWater > 0) {
+      waterDays++;
+      dailyWater.push({ date: dKey, ml: dayWater });
+    }
 
     const entries = STATE.data.journal[dKey] || [];
     entries.forEach(e => {
-      if (onlyImportant && !e.important) return;
+      // Filtre: showAll değilse, rutin tipler (mama/su) gizlenir EĞER important değilse
+      if (!showAll && ROUTINE_TYPES.includes(e.type) && !e.important) return;
       events.push({ ...e, date: dKey });
     });
 
@@ -5499,7 +5580,41 @@ function generateVetReport() {
   }
 
   const avgGrams = mealDays > 0 ? (totalGrams / mealDays).toFixed(0) : 0;
+  const avgWater = waterDays > 0 ? (totalWater / waterDays).toFixed(0) : 0;
   const adherence = totalDoses > 0 ? ((takenDoses / totalDoses) * 100).toFixed(0) : '—';
+
+  // Trend hesaplaması — son yarı vs ilk yarı
+  const computeTrend = (arr, key) => {
+    if (arr.length < 4) return null;
+    const half = Math.floor(arr.length / 2);
+    const firstHalf = arr.slice(0, half);
+    const secondHalf = arr.slice(half);
+    const avg1 = firstHalf.reduce((s,x) => s + x[key], 0) / firstHalf.length;
+    const avg2 = secondHalf.reduce((s,x) => s + x[key], 0) / secondHalf.length;
+    if (avg1 === 0) return null;
+    const pct = ((avg2 - avg1) / avg1) * 100;
+    if (Math.abs(pct) < 5) return { dir: '→', label: 'sabit', pct };
+    if (pct < 0) return { dir: '↘', label: 'azalan', pct };
+    return { dir: '↗', label: 'artan', pct };
+  };
+  const gramsTrend = computeTrend(dailyGrams, 'grams');
+  const waterTrend = computeTrend(dailyWater, 'ml');
+
+  // Kilo karşılaştırması — bu aralıkta ölçülenleri bul
+  const periodWeights = (STATE.data.weights || [])
+    .filter(w => w.date >= start && w.date <= end)
+    .sort((a,b) => a.date.localeCompare(b.date));
+  let weightInfo = null;
+  if (periodWeights.length >= 2) {
+    const first = periodWeights[0];
+    const last = periodWeights[periodWeights.length - 1];
+    const diff = parseFloat(last.kg) - parseFloat(first.kg);
+    const pct = (diff / parseFloat(first.kg)) * 100;
+    weightInfo = { first, last, diff, pct };
+  } else if (periodWeights.length === 1) {
+    weightInfo = { single: periodWeights[0] };
+  }
+
   const moodLabels = {
     energetic:'Enerjik', playful:'Oyuncu', calm:'Sakin',
     tired:'Uyuşuk', hidden:'Saklandı', breathing:'Nefes sorunu',
@@ -5511,9 +5626,16 @@ function generateVetReport() {
     .map(([k,v]) => `${moodLabels[k]||k}: ${v} gün`)
     .join(', ');
 
-  // Save the events globally for click access
-  window._currentVetReport = { events, start, end, onlyImportant, totalDoses, takenDoses, totalGrams, mealDays, avgGrams, adherence, days, moodSummary };
+  // Save state for share button
+  window._currentVetReport = {
+    events, start, end, showAll, days,
+    totalDoses, takenDoses, adherence,
+    totalGrams, mealDays, avgGrams, minDayGrams, maxDayGrams, gramsTrend,
+    totalWater, waterDays, avgWater, waterTrend,
+    weightInfo, moodSummary
+  };
 
+  // Group abnormal events by date for display
   const eventsByDate = {};
   events.forEach(e => {
     if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
@@ -5521,29 +5643,91 @@ function generateVetReport() {
   });
   const eventDates = Object.keys(eventsByDate).sort((a,b) => b.localeCompare(a));
 
-  const reportHtml = `<div class="modal-title">📋 ${fmtDate(start)} — ${fmtDate(end)}</div>
-    <div class="modal-subtitle">${days} günlük rapor • ${onlyImportant ? 'sadece dikkat çekici' : 'tüm olaylar'}</div>
+  // Dikkat çekici olayları say (önemli + kusma/davranış/sağlık/tuvalet)
+  const importantEventCount = events.filter(e => e.important).length;
+  const isToday = days === 1 && start === todayKey();
+  const titleRange = isToday ? 'Bugün' : `${fmtDate(start)} — ${fmtDate(end)}`;
+
+  // Trend renderı
+  const renderTrend = (trend) => {
+    if (!trend) return '';
+    const color = trend.label === 'azalan' ? 'var(--warning)' : trend.label === 'artan' ? 'var(--success)' : 'var(--text-dim)';
+    return `<span style="color: ${color}; font-weight: 600;">${trend.dir} ${trend.label}</span>`;
+  };
+
+  const reportHtml = `<div class="modal-title">📋 ${titleRange}</div>
+    <div class="modal-subtitle">${days === 1 ? '1 günlük rapor' : `${days} günlük rapor`}</div>
 
     <div class="vet-report">
+
+      <!-- ÖZET BÖLÜMÜ -->
       <div class="vet-report-section">
-        <div class="vet-report-title">💊 İlaç Uyumu</div>
-        <div class="vet-report-big">${takenDoses}/${totalDoses} doz <span style="font-size: 14px; color: var(--text-dim);">(${adherence}%)</span></div>
-        ${totalDoses - takenDoses > 0 ? `<div class="vet-report-warn">⚠️ ${totalDoses - takenDoses} doz atlandı</div>` : ''}
+        <div class="vet-report-title">📊 GENEL ÖZET</div>
       </div>
 
-      <div class="vet-report-section">
-        <div class="vet-report-title">🍽️ Beslenme</div>
-        <div class="vet-report-big">${totalGrams.toFixed(0)}g toplam</div>
-        <div class="vet-report-sub">Ortalama ${avgGrams}g/gün • ${mealDays}/${days} gün yedi</div>
+      <!-- İlaç Uyumu -->
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">💊</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">İlaç Uyumu</div>
+          <div class="vet-report-stat-big">${takenDoses}/${totalDoses} doz <span style="color: var(--text-dim); font-size: 14px;">(${adherence}%)</span></div>
+          ${totalDoses - takenDoses > 0 ? `<div class="vet-report-stat-warn">⚠️ ${totalDoses - takenDoses} doz atlandı</div>` : ''}
+        </div>
       </div>
 
-      ${moodSummary ? `<div class="vet-report-section">
-        <div class="vet-report-title">😊 Davranış</div>
-        <div class="vet-report-sub">${escapeHtml(moodSummary)}</div>
+      <!-- Beslenme -->
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">🍽️</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Beslenme</div>
+          <div class="vet-report-stat-big">${avgGrams}g <span style="color: var(--text-dim); font-size: 13px;">ortalama/gün</span></div>
+          ${dailyGrams.length > 0 ? `<div class="vet-report-stat-sub">
+            ${minDayGrams && maxDayGrams && minDayGrams.date !== maxDayGrams.date ? `Min: ${minDayGrams.grams.toFixed(0)}g (${fmtShortDate(minDayGrams.date)}) · Max: ${maxDayGrams.grams.toFixed(0)}g` : ''}
+            ${gramsTrend ? '<br>Trend: '+renderTrend(gramsTrend) : ''}
+            ${days > 1 ? `<br>${mealDays}/${days} gün yedi` : ''}
+          </div>` : '<div class="vet-report-stat-sub">Bu aralıkta mama girişi yok</div>'}
+        </div>
+      </div>
+
+      <!-- Su -->
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">💧</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Su</div>
+          <div class="vet-report-stat-big">${totalWater > 0 ? avgWater + 'ml' : '—'} <span style="color: var(--text-dim); font-size: 13px;">${totalWater > 0 ? 'ortalama/gün' : ''}</span></div>
+          ${dailyWater.length > 0 ? `<div class="vet-report-stat-sub">
+            ${days > 1 ? `Toplam: ${totalWater.toFixed(0)}ml • ${waterDays}/${days} gün` : ''}
+            ${waterTrend ? '<br>Trend: '+renderTrend(waterTrend) : ''}
+          </div>` : '<div class="vet-report-stat-sub">Bu aralıkta su kaydı yok</div>'}
+        </div>
+      </div>
+
+      <!-- Kilo -->
+      ${weightInfo ? `<div class="vet-report-stat">
+        <div class="vet-report-stat-icon">⚖️</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Kilo</div>
+          ${weightInfo.single ? `<div class="vet-report-stat-big">${weightInfo.single.kg} kg</div>
+            <div class="vet-report-stat-sub">${fmtShortDate(weightInfo.single.date)} ölçümü</div>` :
+            `<div class="vet-report-stat-big">${weightInfo.first.kg} → ${weightInfo.last.kg} kg</div>
+            <div class="vet-report-stat-sub" style="color: ${weightInfo.diff < 0 ? 'var(--warning)' : weightInfo.diff > 0 ? 'var(--success)' : 'var(--text-dim)'}; font-weight: 600;">
+              ${weightInfo.diff > 0 ? '+' : ''}${(weightInfo.diff*1000).toFixed(0)}g (${weightInfo.pct > 0 ? '+' : ''}${weightInfo.pct.toFixed(1)}%)
+            </div>`}
+        </div>
       </div>` : ''}
 
-      ${eventDates.length > 0 ? `<div class="vet-report-section">
-        <div class="vet-report-title">${onlyImportant ? '⚠️ Dikkat Çekici Olaylar' : '📖 Tüm Olaylar'} (${events.length})</div>
+      <!-- Davranış -->
+      ${moodSummary ? `<div class="vet-report-stat">
+        <div class="vet-report-stat-icon">😊</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Davranış</div>
+          <div class="vet-report-stat-sub" style="font-size: 13px; color: var(--text);">${escapeHtml(moodSummary)}</div>
+        </div>
+      </div>` : ''}
+
+      <!-- DİKKAT ÇEKİCİ OLAYLAR -->
+      ${eventDates.length > 0 ? `<div class="vet-report-section" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-strong);">
+        <div class="vet-report-title">${showAll ? '📖 TÜM OLAYLAR' : '⚠️ ANORMAL OLAYLAR'} (${events.length})${importantEventCount > 0 && !showAll ? `<span style="color: var(--warning); font-weight: 600; margin-left: 8px;">${importantEventCount} dikkat çekici</span>` : ''}</div>
         <div style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Detay için tıkla</div>
         ${eventDates.map(date => {
           const dayEvents = eventsByDate[date];
@@ -5566,7 +5750,10 @@ function generateVetReport() {
             }).join('')}
           </div>`;
         }).join('')}
-      </div>` : `<div class="vet-report-section"><div class="vet-report-title">📖 Olaylar</div><div class="vet-report-sub" style="font-style: italic;">${onlyImportant ? 'Bu aralıkta dikkat çekici bir olay yok.' : 'Bu aralıkta kaydedilmiş olay yok.'}</div></div>`}
+      </div>` : `<div class="vet-report-section" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-strong);">
+        <div class="vet-report-title">${showAll ? '📖 OLAYLAR' : '⚠️ ANORMAL OLAYLAR'}</div>
+        <div class="vet-report-stat-sub" style="font-style: italic; padding: 12px; text-align: center;">${showAll ? 'Bu aralıkta kayıt yok.' : '✓ Bu aralıkta dikkat çekici bir şey yok — temiz gün(ler).'}</div>
+      </div>`}
     </div>
 
     <div class="modal-actions" style="flex-direction: column; gap: 8px;">
@@ -5577,6 +5764,12 @@ function generateVetReport() {
       </div>
     </div>`;
   openModal(reportHtml);
+}
+
+// Kısa tarih formatı (gün ay)
+function fmtShortDate(dateStr) {
+  const d = parseDate(dateStr);
+  return `${d.getDate()} ${['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()]}`;
 }
 
 // Olay detayını veteriner raporundan açma
@@ -5665,36 +5858,71 @@ async function shareVetReport() {
   const r = window._currentVetReport;
   if (!r) { toast('Önce rapor oluştur', 'error'); return; }
 
-  const moodLabels = {
-    energetic:'Enerjik', playful:'Oyuncu', calm:'Sakin',
-    tired:'Uyuşuk', hidden:'Saklandı', breathing:'Nefes sorunu',
-    vomit:'Kustu', diarrhea:'İshal'
-  };
-
   const petName = STATE.data.profile.name || 'Bihter';
+  const isToday = r.days === 1 && r.start === todayKey();
+  const titleRange = isToday ? 'Bugünkü Rapor' : `${fmtDate(r.start)} - ${fmtDate(r.end)} (${r.days} gün)`;
+
   let text = `🐾 ${petName} - Sağlık Raporu\n`;
-  text += `📅 ${fmtDate(r.start)} - ${fmtDate(r.end)} (${r.days} gün)\n`;
+  text += `📅 ${titleRange}\n`;
   text += `─────────────\n\n`;
 
+  // İlaç uyumu
   text += `💊 İLAÇ UYUMU\n`;
-  text += `${r.takenDoses}/${r.totalDoses} doz alındı (${r.adherence}%)\n`;
+  text += `${r.takenDoses}/${r.totalDoses} doz (${r.adherence}%)\n`;
   if (r.totalDoses - r.takenDoses > 0) {
     text += `⚠️ ${r.totalDoses - r.takenDoses} doz atlandı\n`;
   }
   text += `\n`;
 
+  // Beslenme
   text += `🍽️ BESLENME\n`;
-  text += `Toplam: ${r.totalGrams.toFixed(0)}g\n`;
-  text += `Ortalama: ${r.avgGrams}g/gün\n`;
-  text += `${r.mealDays}/${r.days} gün yedi\n\n`;
+  if (r.avgGrams > 0) {
+    text += `Ortalama: ${r.avgGrams}g/gün\n`;
+    if (r.minDayGrams && r.maxDayGrams && r.minDayGrams.date !== r.maxDayGrams.date) {
+      text += `Min: ${r.minDayGrams.grams.toFixed(0)}g (${fmtShortDate(r.minDayGrams.date)})\n`;
+      text += `Max: ${r.maxDayGrams.grams.toFixed(0)}g\n`;
+    }
+    if (r.gramsTrend) {
+      const trendIcon = r.gramsTrend.dir;
+      text += `Trend: ${trendIcon} ${r.gramsTrend.label}\n`;
+    }
+    if (r.days > 1) text += `${r.mealDays}/${r.days} gün yedi\n`;
+  } else {
+    text += `Bu aralıkta mama girişi yok\n`;
+  }
+  text += `\n`;
 
+  // Su
+  if (r.avgWater > 0) {
+    text += `💧 SU\n`;
+    text += `Ortalama: ${r.avgWater}ml/gün\n`;
+    if (r.days > 1) text += `Toplam: ${r.totalWater.toFixed(0)}ml\n`;
+    if (r.waterTrend) text += `Trend: ${r.waterTrend.dir} ${r.waterTrend.label}\n`;
+    text += `\n`;
+  }
+
+  // Kilo
+  if (r.weightInfo) {
+    text += `⚖️ KİLO\n`;
+    if (r.weightInfo.single) {
+      text += `${r.weightInfo.single.kg} kg (${fmtShortDate(r.weightInfo.single.date)})\n`;
+    } else {
+      text += `${r.weightInfo.first.kg} → ${r.weightInfo.last.kg} kg\n`;
+      const sign = r.weightInfo.diff > 0 ? '+' : '';
+      text += `Değişim: ${sign}${(r.weightInfo.diff*1000).toFixed(0)}g (${sign}${r.weightInfo.pct.toFixed(1)}%)\n`;
+    }
+    text += `\n`;
+  }
+
+  // Davranış
   if (r.moodSummary) {
     text += `😊 DAVRANIŞ\n${r.moodSummary}\n\n`;
   }
 
+  // Anormal Olaylar
   if (r.events.length > 0) {
-    text += `${r.onlyImportant ? '⚠️ DİKKAT ÇEKİCİ OLAYLAR' : '📖 OLAYLAR'} (${r.events.length})\n`;
-    // Group by date
+    text += `─────────────\n`;
+    text += `${r.showAll ? '📖 OLAYLAR' : '⚠️ DİKKAT ÇEKİCİ OLAYLAR'} (${r.events.length})\n`;
     const byDate = {};
     r.events.forEach(e => {
       if (!byDate[e.date]) byDate[e.date] = [];
@@ -5711,11 +5939,12 @@ async function shareVetReport() {
         const detail = getJournalEntryDetail(e);
         const flag = e.important ? ' ⚠️' : '';
         text += `  ${tStr} ${icon} ${title}${detail ? ' - '+detail : ''}${flag}\n`;
-        if (e.note) text += `       ${e.note}\n`;
+        if (e.note) text += `       "${e.note}"\n`;
       });
     });
   } else {
-    text += `📖 Bu aralıkta ${r.onlyImportant ? 'dikkat çekici bir olay yok' : 'kayıt yok'}.\n`;
+    text += `─────────────\n`;
+    text += `✓ ${r.showAll ? 'Bu aralıkta kayıt yok' : 'Bu aralıkta dikkat çekici bir şey yok'}\n`;
   }
 
   text += `\n─────────────\n`;
@@ -5742,7 +5971,6 @@ async function shareVetReport() {
     await navigator.clipboard.writeText(text);
     toast('✓ Rapor kopyalandı, istediğin yere yapıştır', 'success');
   } catch (err) {
-    // Last resort: show in modal for manual copy
     showShareFallback(text);
   }
 }
