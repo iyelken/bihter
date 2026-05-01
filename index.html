@@ -2627,8 +2627,20 @@ function goTo(screen) {
 }
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => goTo(n.dataset.screen)));
 function openModal(html) { document.getElementById('modalContent').innerHTML = html; document.getElementById('modalOverlay').classList.add('active'); }
-function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
-function closeModalOnBg(e) { if (e.target.id === 'modalOverlay') closeModal(); }
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+  // Veteriner raporu detay flag'ini temizle
+  window._inVetReportDetail = false;
+}
+function closeModalOnBg(e) {
+  if (e.target.id !== 'modalOverlay') return;
+  // Eğer veteriner raporundan açılan bir detay penceresindeyse, kapatmak yerine rapora dön
+  if (window._inVetReportDetail) {
+    reopenVetReport();
+    return;
+  }
+  closeModal();
+}
 
 // ============================================================
 // RENDER
@@ -5777,6 +5789,14 @@ function openVetReportEventDetail(eventId, date) {
   const entries = STATE.data.journal[date] || [];
   const e = entries.find(x => x.id === eventId);
   if (!e) { toast('Olay bulunamadı', 'error'); return; }
+  // Save scroll position so we can restore it when going back
+  const modal = document.getElementById('modalContent');
+  if (modal) {
+    const scroller = modal.parentElement;
+    if (scroller) window._vetReportScrollTop = scroller.scrollTop;
+  }
+  // Mark that we're inside the vet report detail
+  window._inVetReportDetail = true;
   showJournalEventDetail(e, date, true);
 }
 
@@ -5845,8 +5865,17 @@ function reopenVetReport() {
   // Saved state'ten raporu yeniden çiz — formdan değil
   const r = window._currentVetReport;
   if (!r) { closeModal(); return; }
-  // Direct render the saved report (don't read form again)
+  // Detay flag'ini kapat
+  window._inVetReportDetail = false;
   renderSavedVetReport();
+  // Scroll konumunu geri yükle (detail'a tıklanan yer)
+  setTimeout(() => {
+    const modal = document.getElementById('modalContent');
+    if (modal && window._vetReportScrollTop != null) {
+      const scroller = modal.parentElement;
+      if (scroller) scroller.scrollTop = window._vetReportScrollTop;
+    }
+  }, 50);
 }
 
 function renderSavedVetReport() {
