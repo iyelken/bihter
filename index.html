@@ -5833,18 +5833,144 @@ function showJournalEventDetail(e, date, fromVetReport) {
 
     <div class="modal-actions" style="flex-direction: column; gap: 8px;">
       <button class="btn btn-secondary btn-block" onclick="goToJournalDate('${date}'); closeModal();">📖 Günlük'te Bu Güne Git</button>
-      <div style="display: flex; gap: 8px; width: 100%;">
-        ${fromVetReport ? `<button class="btn btn-secondary" onclick="reopenVetReport()" style="flex:1;">‹ Rapora Dön</button>` : ''}
-        <button class="btn btn-primary" onclick="closeModal()" style="flex:1;">Kapat</button>
-      </div>
+      ${fromVetReport
+        ? `<button class="btn btn-primary btn-block" onclick="reopenVetReport()">‹ Rapora Dön</button>`
+        : `<button class="btn btn-primary btn-block" onclick="closeModal()">Kapat</button>`
+      }
     </div>`;
   openModal(html);
 }
 
 function reopenVetReport() {
-  // Re-render the report from saved state
-  if (!window._currentVetReport) { closeModal(); return; }
-  generateVetReport();
+  // Saved state'ten raporu yeniden çiz — formdan değil
+  const r = window._currentVetReport;
+  if (!r) { closeModal(); return; }
+  // Direct render the saved report (don't read form again)
+  renderSavedVetReport();
+}
+
+function renderSavedVetReport() {
+  const r = window._currentVetReport;
+  if (!r) { closeModal(); return; }
+
+  // Group abnormal events by date
+  const eventsByDate = {};
+  r.events.forEach(e => {
+    if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
+    eventsByDate[e.date].push(e);
+  });
+  const eventDates = Object.keys(eventsByDate).sort((a,b) => b.localeCompare(a));
+  const importantEventCount = r.events.filter(e => e.important).length;
+  const isToday = r.days === 1 && r.start === todayKey();
+  const titleRange = isToday ? 'Bugün' : `${fmtDate(r.start)} — ${fmtDate(r.end)}`;
+
+  const renderTrend = (trend) => {
+    if (!trend) return '';
+    const color = trend.label === 'azalan' ? 'var(--warning)' : trend.label === 'artan' ? 'var(--success)' : 'var(--text-dim)';
+    return `<span style="color: ${color}; font-weight: 600;">${trend.dir} ${trend.label}</span>`;
+  };
+
+  const reportHtml = `<div class="modal-title">📋 ${titleRange}</div>
+    <div class="modal-subtitle">${r.days === 1 ? '1 günlük rapor' : `${r.days} günlük rapor`}</div>
+
+    <div class="vet-report">
+      <div class="vet-report-section">
+        <div class="vet-report-title">📊 GENEL ÖZET</div>
+      </div>
+
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">💊</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">İlaç Uyumu</div>
+          <div class="vet-report-stat-big">${r.takenDoses}/${r.totalDoses} doz <span style="color: var(--text-dim); font-size: 14px;">(${r.adherence}%)</span></div>
+          ${r.totalDoses - r.takenDoses > 0 ? `<div class="vet-report-stat-warn">⚠️ ${r.totalDoses - r.takenDoses} doz atlandı</div>` : ''}
+        </div>
+      </div>
+
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">🍽️</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Beslenme</div>
+          <div class="vet-report-stat-big">${r.avgGrams}g <span style="color: var(--text-dim); font-size: 13px;">ortalama/gün</span></div>
+          ${r.avgGrams > 0 ? `<div class="vet-report-stat-sub">
+            ${r.minDayGrams && r.maxDayGrams && r.minDayGrams.date !== r.maxDayGrams.date ? `Min: ${r.minDayGrams.grams.toFixed(0)}g (${fmtShortDate(r.minDayGrams.date)}) · Max: ${r.maxDayGrams.grams.toFixed(0)}g` : ''}
+            ${r.gramsTrend ? '<br>Trend: '+renderTrend(r.gramsTrend) : ''}
+            ${r.days > 1 ? `<br>${r.mealDays}/${r.days} gün yedi` : ''}
+          </div>` : '<div class="vet-report-stat-sub">Bu aralıkta mama girişi yok</div>'}
+        </div>
+      </div>
+
+      <div class="vet-report-stat">
+        <div class="vet-report-stat-icon">💧</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Su</div>
+          <div class="vet-report-stat-big">${r.totalWater > 0 ? r.avgWater + 'ml' : '—'} <span style="color: var(--text-dim); font-size: 13px;">${r.totalWater > 0 ? 'ortalama/gün' : ''}</span></div>
+          ${r.totalWater > 0 ? `<div class="vet-report-stat-sub">
+            ${r.days > 1 ? `Toplam: ${r.totalWater.toFixed(0)}ml • ${r.waterDays}/${r.days} gün` : ''}
+            ${r.waterTrend ? '<br>Trend: '+renderTrend(r.waterTrend) : ''}
+          </div>` : '<div class="vet-report-stat-sub">Bu aralıkta su kaydı yok</div>'}
+        </div>
+      </div>
+
+      ${r.weightInfo ? `<div class="vet-report-stat">
+        <div class="vet-report-stat-icon">⚖️</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Kilo</div>
+          ${r.weightInfo.single ? `<div class="vet-report-stat-big">${r.weightInfo.single.kg} kg</div>
+            <div class="vet-report-stat-sub">${fmtShortDate(r.weightInfo.single.date)} ölçümü</div>` :
+            `<div class="vet-report-stat-big">${r.weightInfo.first.kg} → ${r.weightInfo.last.kg} kg</div>
+            <div class="vet-report-stat-sub" style="color: ${r.weightInfo.diff < 0 ? 'var(--warning)' : r.weightInfo.diff > 0 ? 'var(--success)' : 'var(--text-dim)'}; font-weight: 600;">
+              ${r.weightInfo.diff > 0 ? '+' : ''}${(r.weightInfo.diff*1000).toFixed(0)}g (${r.weightInfo.pct > 0 ? '+' : ''}${r.weightInfo.pct.toFixed(1)}%)
+            </div>`}
+        </div>
+      </div>` : ''}
+
+      ${r.moodSummary ? `<div class="vet-report-stat">
+        <div class="vet-report-stat-icon">😊</div>
+        <div class="vet-report-stat-content">
+          <div class="vet-report-stat-label">Davranış</div>
+          <div class="vet-report-stat-sub" style="font-size: 13px; color: var(--text);">${escapeHtml(r.moodSummary)}</div>
+        </div>
+      </div>` : ''}
+
+      ${eventDates.length > 0 ? `<div class="vet-report-section" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-strong);">
+        <div class="vet-report-title">${r.showAll ? '📖 TÜM OLAYLAR' : '⚠️ ANORMAL OLAYLAR'} (${r.events.length})${importantEventCount > 0 && !r.showAll ? `<span style="color: var(--warning); font-weight: 600; margin-left: 8px;">${importantEventCount} dikkat çekici</span>` : ''}</div>
+        <div style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">Detay için tıkla</div>
+        ${eventDates.map(date => {
+          const dayEvents = eventsByDate[date];
+          return `<div style="margin-top: 10px;">
+            <div style="font-family: 'Fraunces', serif; font-size: 13px; font-weight: 500; color: var(--text-dim); margin-bottom: 4px;">${fmtDate(date)}</div>
+            ${dayEvents.map(e => {
+              const t = new Date(e.time);
+              const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+              return `<div class="vet-report-event" onclick="openVetReportEventDetail('${e.id}','${e.date}')">
+                <span style="font-family: 'Fraunces', serif; color: var(--text-dim); min-width: 44px;">${tStr}</span>
+                <span>${JOURNAL_TYPES[e.type]?.icon||''}</span>
+                <span style="flex: 1;">
+                  <b>${escapeHtml(getJournalEntryTitle(e))}</b>
+                  ${getJournalEntryDetail(e) ? '<span style="color: var(--text-dim);"> • '+escapeHtml(getJournalEntryDetail(e))+'</span>' : ''}
+                  ${e.important ? '<span style="color: var(--warning); margin-left: 6px;">⚠️</span>' : ''}
+                  ${e.photo ? '<span style="margin-left: 6px; opacity: 0.6;">📷</span>' : ''}
+                </span>
+                <span style="color: var(--text-faint); font-size: 14px;">›</span>
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>` : `<div class="vet-report-section" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-strong);">
+        <div class="vet-report-title">${r.showAll ? '📖 OLAYLAR' : '⚠️ ANORMAL OLAYLAR'}</div>
+        <div class="vet-report-stat-sub" style="font-style: italic; padding: 12px; text-align: center;">${r.showAll ? 'Bu aralıkta kayıt yok.' : '✓ Bu aralıkta dikkat çekici bir şey yok — temiz gün(ler).'}</div>
+      </div>`}
+    </div>
+
+    <div class="modal-actions" style="flex-direction: column; gap: 8px;">
+      <button class="btn btn-primary btn-block" onclick="shareVetReport()">📤 Paylaş (WhatsApp / Mesaj / E-posta)</button>
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <button class="btn btn-secondary" onclick="openVetReportModal()" style="flex:1;">‹ Geri</button>
+        <button class="btn btn-secondary" onclick="closeModal()" style="flex:1;">Tamam</button>
+      </div>
+    </div>`;
+  openModal(reportHtml);
 }
 
 function goToJournalDate(date) {
