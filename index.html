@@ -5012,7 +5012,11 @@ function getJournalEntryDetail(e) {
 function renderJournalItem(it) {
   const t = new Date(it.time);
   const tStr = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
-  const autoClass = it.auto ? 'journal-auto' : 'journal-manual';
+  // Soluk gösterilecek tipler: rutin olanlar (mama, su)
+  // Parlak: ilaç, kusma, tuvalet, davranış, foto, sağlık, kilo, not
+  const DIM_TYPES = ['meal', 'water', 'auto-meal'];
+  const isDim = DIM_TYPES.includes(it.type) && !it.important;
+  const autoClass = isDim ? 'journal-auto' : 'journal-manual';
   const flagClass = it.important ? 'journal-important' : '';
   const clickHandler = it.manual ? `onclick="openJournalEntryModal('${it.entryId}')"` : '';
   const date = getCurrentJournalDate();
