@@ -2515,17 +2515,128 @@ function startCloudListener() {
         STATE.data = mergeData(STATE.data, remote);
         renderAll(); scheduleNotifications();
       }
+      lastSyncSuccessAt = Date.now();
       setSyncStatus('ok', 'Senkronize');
     } catch(e) { console.warn(e); }
   }, err => { console.warn(err); setSyncStatus('offline', 'Çevrimdışı'); });
 }
+
+// Akıllı birleştirme — gün bazlı, ID bazlı, son düzenlemeyi koru
 function mergeData(local, remote) {
   const merged = { ...remote };
+
+  // Tarih anahtarlı nesneler — gün gün birleştir
+  // Local'de yeni gün varsa korunur, remote'da yeni gün varsa korunur
+  // Çakışan günde — daha çok girişe sahip olan kazanır (genelde yeni veri eklenmiştir)
   ['medLogs','mealLogs','waterLogs','moods','mealEntries','journal'].forEach(key => {
-    merged[key] = { ...(remote[key]||{}), ...(local[key]||{}) };
+    merged[key] = { ...(remote[key] || {}) };
+    Object.keys(local[key] || {}).forEach(dateKey => {
+      const localDay = local[key][dateKey];
+      const remoteDay = (remote[key] || {})[dateKey];
+
+      if (!remoteDay) {
+        // Bulutta bu gün yok, yerelden al
+        merged[key][dateKey] = localDay;
+        return;
+      }
+
+      // İkisinde de var — array ise ID bazlı birleştir, yoksa daha "büyük" olan kazansın
+      if (Array.isArray(localDay) && Array.isArray(remoteDay)) {
+        // ID bazlı birleştir
+        const map = {};
+        remoteDay.forEach(item => { if (item && item.id) map[item.id] = item; });
+        localDay.forEach(item => { if (item && item.id) map[item.id] = item; });
+        merged[key][dateKey] = Object.values(map);
+      } else if (typeof localDay === 'object' && typeof remoteDay === 'object' && !Array.isArray(localDay)) {
+        // Object — key bazlı birleştir (örn medLogs: { scheduleId: timestamp })
+        merged[key][dateKey] = { ...remoteDay, ...localDay };
+      } else if (typeof localDay === 'number' && typeof remoteDay === 'number') {
+        // Sayı (örn waterLogs) — daha büyük olanı kullan
+        merged[key][dateKey] = Math.max(localDay, remoteDay);
+      } else {
+        // Diğer — yereli kullan
+        merged[key][dateKey] = localDay;
+      }
+    });
   });
+
+  // Array'ler (meds, medSchedule, weights, tests, vaccines, events) — ID bazlı birleştir
+  ['meds', 'medSchedule', 'weights', 'tests', 'vaccines', 'events', 'history'].forEach(key => {
+    if (!local[key] && !remote[key]) return;
+    const map = {};
+    (remote[key] || []).forEach(item => {
+      const k = (item && item.id) ? item.id : (item && item.date) ? item.date : JSON.stringify(item);
+      map[k] = item;
+    });
+    (local[key] || []).forEach(item => {
+      const k = (item && item.id) ? item.id : (item && item.date) ? item.date : JSON.stringify(item);
+      map[k] = item;
+    });
+    merged[key] = Object.values(map);
+  });
+
+  // Profile — local öncelikli (kullanıcı bilgileri)
+  if (local.profile) {
+    merged.profile = { ...(remote.profile || {}), ...local.profile };
+  }
+
   return merged;
 }
+
+// Düzenli olarak buluttan veri çek (real-time listener'ın kopması için yedek)
+let pollIntervalId = null;
+let lastSyncSuccessAt = 0;
+
+function startPeriodicPoll() {
+  if (pollIntervalId) clearInterval(pollIntervalId);
+  pollIntervalId = setInterval(async () => {
+    if (!firestoreReady || !STATE.cloudId || !STATE.password) return;
+    if (document.hidden) return; // arka planda iken poll yapma
+    try {
+      const doc = await db.collection('bihter_app').doc(STATE.cloudId).get({ source: 'server' });
+      if (!doc.exists) return;
+      const json = decrypt(doc.data().payload, STATE.password);
+      if (!json) return;
+      const remote = JSON.parse(json);
+      if (JSON.stringify(STATE.data) !== json) {
+        STATE.data = mergeData(STATE.data, remote);
+        renderAll();
+      }
+      lastSyncSuccessAt = Date.now();
+      setSyncStatus('ok', 'Senkronize');
+    } catch (e) {
+      console.warn('poll failed:', e);
+      // Eğer 2 dakikadan uzun süredir başarılı sync yoksa offline göster
+      if (Date.now() - lastSyncSuccessAt > 120000) {
+        setSyncStatus('offline', 'Bağlantı yok');
+      }
+    }
+  }, 20000); // 20 saniyede bir kontrol
+}
+
+// Sayfa görünür olduğunda hemen yeni veri çek
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && firestoreReady && STATE.cloudId) {
+    // Hemen güncel veriyi çek
+    setTimeout(async () => {
+      try {
+        const doc = await db.collection('bihter_app').doc(STATE.cloudId).get({ source: 'server' });
+        if (doc.exists) {
+          const json = decrypt(doc.data().payload, STATE.password);
+          if (json) {
+            const remote = JSON.parse(json);
+            if (JSON.stringify(STATE.data) !== json) {
+              STATE.data = mergeData(STATE.data, remote);
+              renderAll();
+            }
+            lastSyncSuccessAt = Date.now();
+            setSyncStatus('ok', 'Senkronize');
+          }
+        }
+      } catch(e) { console.warn(e); }
+    }, 200);
+  }
+});
 
 // ============================================================
 // LOGIN
@@ -2671,12 +2782,15 @@ function enterApp() {
   migrateMedsToSchedule();
   migrateVetsToArray();
   startCloudListener();
+  startPeriodicPoll();
+  lastSyncSuccessAt = Date.now();
   renderAll();
   scheduleNotifications();
   setTimeout(() => requestNotificationPermission(), 1500);
 }
 function logout() {
   if (firestoreUnsub) firestoreUnsub();
+  if (pollIntervalId) clearInterval(pollIntervalId);
   localStorage.removeItem('bihter_session');
   STATE.cloudId = null; STATE.password = null;
   document.getElementById('loginScreen').classList.remove('hidden');
