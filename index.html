@@ -2512,6 +2512,7 @@ function startCloudListener() {
     try {
       const remote = JSON.parse(json);
       if (JSON.stringify(STATE.data) !== json) {
+        if (isUserTyping) return; // yazıyor — bekle
         STATE.data = mergeData(STATE.data, remote);
         renderAll(); scheduleNotifications();
       }
@@ -2587,11 +2588,45 @@ function mergeData(local, remote) {
 let pollIntervalId = null;
 let lastSyncSuccessAt = 0;
 
+// Yazma anında gelen veriler ekranı yeniliyor → klavye kapanıyor.
+// Kullanıcı yazıyorsa poll'i ve gelen veri renderini geçici askıya al
+let isUserTyping = false;
+let typingTimeoutId = null;
+
+function markUserTyping() {
+  isUserTyping = true;
+  if (typingTimeoutId) clearTimeout(typingTimeoutId);
+  // Yazma bittiği anlaşılana kadar 2 saniye bekle
+  typingTimeoutId = setTimeout(() => { isUserTyping = false; }, 2000);
+}
+
+// Tüm input/textarea'lara yazma takibi ekle
+document.addEventListener('input', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+    markUserTyping();
+  }
+}, true);
+
+document.addEventListener('focusin', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+    markUserTyping();
+  }
+}, true);
+
+document.addEventListener('focusout', e => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+    // Yazma bitti — flag'i hemen düşürmeyelim, 500ms grace period
+    if (typingTimeoutId) clearTimeout(typingTimeoutId);
+    typingTimeoutId = setTimeout(() => { isUserTyping = false; }, 500);
+  }
+}, true);
+
 function startPeriodicPoll() {
   if (pollIntervalId) clearInterval(pollIntervalId);
   pollIntervalId = setInterval(async () => {
     if (!firestoreReady || !STATE.cloudId || !STATE.password) return;
     if (document.hidden) return; // arka planda iken poll yapma
+    if (isUserTyping) return; // kullanıcı yazıyor — engelleme
     try {
       const doc = await db.collection('bihter_app').doc(STATE.cloudId).get({ source: 'server' });
       if (!doc.exists) return;
@@ -2599,6 +2634,8 @@ function startPeriodicPoll() {
       if (!json) return;
       const remote = JSON.parse(json);
       if (JSON.stringify(STATE.data) !== json) {
+        // Tekrar kontrol — bu aşamada yazmaya başlamış olabilir
+        if (isUserTyping) return;
         STATE.data = mergeData(STATE.data, remote);
         renderAll();
       }
@@ -2606,12 +2643,11 @@ function startPeriodicPoll() {
       setSyncStatus('ok', 'Senkronize');
     } catch (e) {
       console.warn('poll failed:', e);
-      // Eğer 2 dakikadan uzun süredir başarılı sync yoksa offline göster
       if (Date.now() - lastSyncSuccessAt > 120000) {
         setSyncStatus('offline', 'Bağlantı yok');
       }
     }
-  }, 20000); // 20 saniyede bir kontrol
+  }, 20000);
 }
 
 // Sayfa görünür olduğunda hemen yeni veri çek
