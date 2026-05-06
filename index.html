@@ -4588,6 +4588,7 @@ function openSettings() {
     <div class="card-title" style="margin-top: 16px;">Hesap</div>
     <div class="setting-item"><div class="setting-icon">🔐</div><div class="setting-info"><div class="setting-label">Bulut ID</div><div class="setting-value">${escapeHtml(STATE.cloudId||'')}</div></div></div>
     <div class="setting-item" onclick="exportData()"><div class="setting-icon">📤</div><div class="setting-info"><div class="setting-label">Veriyi Dışa Aktar</div><div class="setting-value">JSON yedek dosyası</div></div><div class="setting-arrow">›</div></div>
+    <div class="setting-item" onclick="closeModal();setTimeout(importData,150);"><div class="setting-icon">📥</div><div class="setting-info"><div class="setting-label">Veriyi İçe Aktar</div><div class="setting-value">JSON yedeğinden yükle</div></div><div class="setting-arrow">›</div></div>
     <div class="setting-item" onclick="logout()"><div class="setting-icon" style="color: var(--danger);">↩</div><div class="setting-info"><div class="setting-label" style="color: var(--danger);">Çıkış Yap</div><div class="setting-value">Bu cihazdan çıkış</div></div></div>
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Kapat</button><button class="btn btn-primary" onclick="saveSettings()">Kaydet</button></div>`);
 }
@@ -4735,6 +4736,182 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = `bihter-yedek-${todayKey()}.json`; a.click();
   URL.revokeObjectURL(url); toast('Yedek indirildi', 'success');
+}
+
+function importData() {
+  // Hidden file input oluştur
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json,.json';
+  inp.style.display = 'none';
+  inp.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { toast('Dosya çok büyük (max 50MB)', 'error'); return; }
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+
+      // Geçerli yapı mı?
+      if (!imported || typeof imported !== 'object') { toast('Geçersiz yedek dosyası', 'error'); return; }
+      if (!imported.profile && !imported.journal && !imported.meds) {
+        toast('Bu dosya bir Bihter Sağlık yedeği değil', 'error'); return;
+      }
+
+      // Özet hesapla — kullanıcıya göster
+      const journalDays = imported.journal ? Object.keys(imported.journal).length : 0;
+      const totalEvents = imported.journal
+        ? Object.values(imported.journal).reduce((s, arr) => s + arr.length, 0) : 0;
+      const medCount = (imported.meds || []).length;
+      const scheduleCount = (imported.medSchedule || []).length;
+      const weightCount = (imported.weights || []).length;
+      const testCount = (imported.tests || []).length;
+
+      // Tarih aralığı
+      let dateRange = '';
+      if (imported.journal && journalDays > 0) {
+        const dates = Object.keys(imported.journal).sort();
+        dateRange = `${fmtDate(dates[0])} → ${fmtDate(dates[dates.length-1])}`;
+      }
+
+      const currentJournalDays = STATE.data.journal ? Object.keys(STATE.data.journal).length : 0;
+      const currentEvents = STATE.data.journal
+        ? Object.values(STATE.data.journal).reduce((s, arr) => s + arr.length, 0) : 0;
+
+      // Onay modalı
+      openModal(`<div class="modal-title">📥 Yedeği İçe Aktar</div>
+        <div class="modal-subtitle">Yedek dosyası incelendi. Devam etmeden önce onayla.</div>
+
+        <div class="card" style="background: var(--bg-elev);">
+          <div class="card-title"><span>📦 Yedek İçeriği</span></div>
+          <div class="event-detail-row">
+            <span class="event-detail-key">Tarih</span>
+            <span class="event-detail-val">${dateRange || '—'}</span>
+          </div>
+          <div class="event-detail-row">
+            <span class="event-detail-key">Günlük</span>
+            <span class="event-detail-val">${journalDays} gün • ${totalEvents} olay</span>
+          </div>
+          <div class="event-detail-row">
+            <span class="event-detail-key">İlaçlar</span>
+            <span class="event-detail-val">${medCount} çeşit • ${scheduleCount} takvim girişi</span>
+          </div>
+          <div class="event-detail-row">
+            <span class="event-detail-key">Kilo</span>
+            <span class="event-detail-val">${weightCount} kayıt</span>
+          </div>
+          <div class="event-detail-row">
+            <span class="event-detail-key">Tahlil</span>
+            <span class="event-detail-val">${testCount} kayıt</span>
+          </div>
+        </div>
+
+        <div class="card" style="background: rgba(245,179,66,0.1); border-color: var(--warning);">
+          <div class="card-title" style="color: var(--warning);"><span>⚠️ Mevcut Verilerin</span></div>
+          <div style="font-size: 13px; color: var(--text); line-height: 1.6;">
+            Şu an cihazında <b>${currentJournalDays} gün, ${currentEvents} olay</b> kayıtlı.
+            <br><br>
+            <b>"Birleştir":</b> Yeni veriler eklenir, çakışan günlerde yedekteki kayıt kullanılır. Eski verilerin silinmez.
+            <br><br>
+            <b>"Tamamen Değiştir":</b> Şu anki tüm verilerin SİLİNİR, sadece yedektekiler kalır. Geri alınamaz.
+          </div>
+        </div>
+
+        <div class="modal-actions" style="flex-direction: column; gap: 8px;">
+          <button class="btn btn-primary btn-block" onclick='confirmImport(${JSON.stringify(JSON.stringify(imported)).replace(/'/g, "\\'")}, "merge")'>🔄 Birleştir (önerilen)</button>
+          <button class="btn btn-secondary btn-block" onclick='confirmImport(${JSON.stringify(JSON.stringify(imported)).replace(/'/g, "\\'")}, "replace")' style="color: var(--danger);">🗑️ Tamamen Değiştir</button>
+          <button class="btn btn-secondary btn-block" onclick="closeModal()">İptal</button>
+        </div>`);
+    } catch (err) {
+      console.error(err);
+      toast('Dosya okunamadı: ' + err.message, 'error');
+    }
+  };
+  document.body.appendChild(inp);
+  inp.click();
+  setTimeout(() => inp.remove(), 30000);
+}
+
+async function confirmImport(jsonStr, mode) {
+  try {
+    const imported = JSON.parse(jsonStr);
+
+    if (mode === 'replace') {
+      if (!confirm('SON UYARI: Tüm mevcut veriler silinecek ve yedektekilerle değiştirilecek. Emin misin?')) return;
+      // Tamamen değiştir — ama cloudId ve password korunur (zaten data dışında)
+      STATE.data = { ...imported };
+    } else {
+      // Birleştir
+      STATE.data = mergeImported(STATE.data, imported);
+    }
+
+    closeModal();
+    toast('İçe aktarılıyor, lütfen bekle...', 'success');
+
+    // Yerel kaydet ve buluta zorla yükle
+    saveLocal();
+    pendingCloudSave = true;
+    try { localStorage.setItem('bihter_pending_' + STATE.cloudId, '1'); } catch(e) {}
+
+    // Hemen buluta yükle (debounce yok)
+    await pushToCloud();
+    renderAll();
+    scheduleNotifications();
+    toast(`✓ ${mode === 'replace' ? 'Tamamen değiştirildi' : 'Veriler birleştirildi'}`, 'success');
+  } catch (err) {
+    console.error(err);
+    toast('İçe aktarma hatası: ' + err.message, 'error');
+  }
+}
+
+function mergeImported(local, imported) {
+  // Birleştirme: yedektekiler öncelikli (çünkü yedek genelde daha doğru)
+  const merged = { ...local };
+
+  // Profile — yedek varsa yedeği al
+  if (imported.profile) merged.profile = { ...local.profile, ...imported.profile };
+
+  // Array'ler için: ID bazında merge (yedektekiler öncelikli)
+  ['meds', 'medSchedule', 'weights', 'tests', 'vaccines', 'events', 'history'].forEach(key => {
+    if (!imported[key]) return;
+    const localArr = local[key] || [];
+    const importedArr = imported[key] || [];
+    // ID'ye göre eşle, yedektekiler kazanır
+    const map = {};
+    localArr.forEach(item => { if (item && item.id) map[item.id] = item; });
+    importedArr.forEach(item => { if (item && item.id) map[item.id] = item; });
+    // Date'e göre olanlar (weights — id yok)
+    if (key === 'weights') {
+      const dateMap = {};
+      localArr.forEach(w => { if (w && w.date) dateMap[w.date] = w; });
+      importedArr.forEach(w => { if (w && w.date) dateMap[w.date] = w; });
+      merged[key] = Object.values(dateMap);
+    } else {
+      merged[key] = Object.values(map);
+      // Eğer ID'siz öğeler varsa onları da ekle (ama duplikasyon olur — basit haliyle bırakalım)
+      const noIdLocal = localArr.filter(x => !x || !x.id);
+      const noIdImported = importedArr.filter(x => !x || !x.id);
+      // Bu durumda yedeği öncelikli al
+      if (noIdImported.length > 0) merged[key] = [...merged[key], ...noIdImported];
+      else if (noIdLocal.length > 0) merged[key] = [...merged[key], ...noIdLocal];
+    }
+  });
+
+  // Date-keyed nesneler — gün bazında merge, yedektekiler öncelikli
+  ['medLogs', 'mealLogs', 'waterLogs', 'moods', 'mealEntries', 'journal'].forEach(key => {
+    if (!imported[key]) return;
+    merged[key] = { ...(local[key] || {}) };
+    Object.keys(imported[key]).forEach(dateKey => {
+      // Yedekteki günü al (eski cihazdaki o günün verisini ezer)
+      merged[key][dateKey] = imported[key][dateKey];
+    });
+  });
+
+  // foodInfo — yedek varsa yedeği
+  if (imported.foodInfo) merged.foodInfo = imported.foodInfo;
+  if (imported.parasiteSchedule) merged.parasiteSchedule = imported.parasiteSchedule;
+
+  return merged;
 }
 function getNotifStatusText() {
   if (!('Notification' in window)) return 'Desteklenmiyor';
