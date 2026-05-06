@@ -4447,7 +4447,7 @@ async function saveTest() {
           else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          resolve(canvas.toDataURL('image/jpeg', 0.5));
         };
         img.src = ev.target.result;
       };
@@ -5639,7 +5639,7 @@ async function saveJournalEntry(type, existingId, formDate) {
           else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          resolve(canvas.toDataURL('image/jpeg', 0.5));
         };
         img.src = ev.target.result;
       };
